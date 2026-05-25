@@ -1,0 +1,13 @@
+{
+  "common": {
+    "language": {
+      "title": "Language",
+      "vi": "Vietnamese",
+      "en": "English"
+    },
+    "theme": "Appearance"
+  },
+  "auth": {
+    "login": "Login"
+  }
+}

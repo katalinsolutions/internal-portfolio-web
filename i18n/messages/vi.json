@@ -1,0 +1,13 @@
+{
+  "common": {
+    "language": {
+      "title": "Ngôn ngữ",
+      "vi": "Tiếng Việt",
+      "en": "Tiếng Anh"
+    },
+    "theme": "Giao diện"
+  },
+  "auth": {
+    "login": "Đăng nhập"
+  }
+}
