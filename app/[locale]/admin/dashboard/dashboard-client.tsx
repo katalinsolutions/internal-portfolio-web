@@ -1,0 +1,2527 @@
+'use client';
+
+import { useState, useTransition, useMemo, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  RiExternalLinkLine,
+  RiEditLine,
+  RiLogoutBoxRLine,
+  RiUploadCloud2Line,
+  RiLoader4Line,
+  RiCloseLine,
+  RiGlobalLine,
+  RiDeleteBinLine,
+  RiSearchLine,
+  RiAddLine,
+  RiCheckLine,
+  RiArrowRightLine,
+  RiArrowLeftLine,
+  RiImageLine,
+  RiLink,
+  RiTranslate2,
+  RiDragMove2Line,
+  RiShoppingBag3Line,
+  RiServiceLine,
+  RiBriefcaseLine,
+  RiFileTextLine,
+  RiMegaphoneLine,
+  RiLayoutLine,
+  RiSettings4Line,
+  RiPhoneLine,
+  RiPhoneFill,
+  RiTimeLine,
+  RiMessengerLine,
+} from '@remixicon/react';
+import {
+  saveTemplateAction,
+  uploadThumbnailAction,
+  logoutAdmin,
+  createTemplateAction,
+  deleteTemplateAction,
+  saveContactSettingsAction,
+  deleteContactLeadAction,
+  updateContactLeadStatusAction,
+  savePricingPlanAction,
+  createPricingPlanAction,
+  deletePricingPlanAction,
+} from '../actions';
+import { TemplateData, ContactSettings, ContactLead, PricingPlan } from '@/lib/db';
+import WebsiteLivePreview from '@/components/shared/website-live-preview';
+
+interface DashboardClientProps {
+  initialTemplates: TemplateData[];
+  initialContactSettings: ContactSettings;
+  initialLeads: ContactLead[];
+  initialPricingPlans: PricingPlan[];
+}
+
+// ─── Category config ────────────────────────────────────────────────────────
+const CATEGORY_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+  sales: {
+    label: 'Bán hàng',
+    color: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400',
+    icon: <RiShoppingBag3Line className='w-4 h-4' />,
+  },
+  services: {
+    label: 'Dịch vụ',
+    color: 'bg-amber-500/10 border-amber-500/20 text-amber-400',
+    icon: <RiServiceLine className='w-4 h-4' />,
+  },
+  intro: {
+    label: 'Giới thiệu',
+    color: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
+    icon: <RiBriefcaseLine className='w-4 h-4' />,
+  },
+  landing: {
+    label: 'Landing Page',
+    color: 'bg-rose-500/10 border-rose-500/20 text-rose-400',
+    icon: <RiFileTextLine className='w-4 h-4' />,
+  },
+  web: {
+    label: 'Thiết kế Web',
+    color: 'bg-blue-500/10 border-blue-500/20 text-blue-400',
+    icon: <RiLayoutLine className='w-4 h-4' />,
+  },
+  marketing: {
+    label: 'Marketing',
+    color: 'bg-purple-500/10 border-purple-500/20 text-purple-400',
+    icon: <RiMegaphoneLine className='w-4 h-4' />,
+  },
+};
+
+const getCatConfig = (cat: string) =>
+  CATEGORY_CONFIG[cat] ?? {
+    label: cat,
+    color: 'bg-slate-500/10 border-slate-500/20 text-slate-400',
+    icon: <RiGlobalLine className='w-4 h-4' />,
+  };
+
+// ─── Wizard Steps ────────────────────────────────────────────────────────────
+const STEPS = [
+  { id: 1, label: 'Thông tin cơ bản', icon: <RiLink className='w-4 h-4' /> },
+  { id: 2, label: 'Tên & Mô tả', icon: <RiTranslate2 className='w-4 h-4' /> },
+  { id: 3, label: 'Ảnh đại diện', icon: <RiImageLine className='w-4 h-4' /> },
+];
+
+// ─── Drag-drop thumbnail uploader ────────────────────────────────────────────
+function ThumbnailUploader({
+  thumbnailUrl,
+  onUrlChange,
+  isUploading,
+  uploadError,
+  onFileSelect,
+  inputId,
+}: {
+  thumbnailUrl: string | null;
+  onUrlChange: (url: string | null) => void;
+  isUploading: boolean;
+  uploadError: string | null;
+  onFileSelect: (file: File) => void;
+  inputId: string;
+}) {
+  const [isDragging, setIsDragging] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('image/')) {
+        onFileSelect(file);
+      }
+    },
+    [onFileSelect],
+  );
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) onFileSelect(file);
+  };
+
+  return (
+    <div className='space-y-4'>
+      {/* Drop Zone */}
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={handleDrop}
+        onClick={() => !thumbnailUrl && inputRef.current?.click()}
+        className={`relative rounded-2xl border-2 border-dashed transition-all duration-300 overflow-hidden ${
+          thumbnailUrl
+            ? 'border-transparent cursor-default'
+            : isDragging
+              ? 'border-primary bg-primary/5 scale-[1.01]'
+              : 'border-slate-700 hover:border-primary/50 hover:bg-slate-900/60 cursor-pointer'
+        }`}
+      >
+        {thumbnailUrl ? (
+          /* Preview */
+          <div className='relative group'>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={thumbnailUrl}
+              alt='Thumbnail preview'
+              className='w-full h-52 object-cover object-top'
+            />
+            {/* Hover scroll effect */}
+            <div className='absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300' />
+            {/* Actions overlay */}
+            <div className='absolute inset-0 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-black/50 backdrop-blur-xs'>
+              <button
+                type='button'
+                onClick={(e) => {
+                  e.stopPropagation();
+                  inputRef.current?.click();
+                }}
+                disabled={isUploading}
+                className='px-4 py-2 bg-white text-slate-900 text-xs font-extrabold rounded-xl shadow-lg hover:bg-slate-100 transition-colors flex items-center gap-1.5 cursor-pointer'
+              >
+                <RiUploadCloud2Line className='w-4 h-4' />
+                Đổi ảnh
+              </button>
+              <button
+                type='button'
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUrlChange(null);
+                }}
+                disabled={isUploading}
+                className='px-4 py-2 bg-red-500/90 text-white text-xs font-extrabold rounded-xl shadow-lg hover:bg-red-500 transition-colors flex items-center gap-1.5 cursor-pointer'
+              >
+                <RiDeleteBinLine className='w-4 h-4' />
+                Xoá ảnh
+              </button>
+            </div>
+            {/* Success badge */}
+            <div className='absolute top-3 left-3 bg-emerald-500 text-white text-3xs font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1'>
+              <RiCheckLine className='w-3 h-3' />
+              Đã upload
+            </div>
+          </div>
+        ) : (
+          /* Empty zone */
+          <div className='h-52 flex flex-col items-center justify-center gap-4 p-8 text-center'>
+            {isUploading ? (
+              <>
+                <div className='w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center'>
+                  <RiLoader4Line className='w-7 h-7 text-primary animate-spin' />
+                </div>
+                <div>
+                  <p className='text-sm font-bold text-white'>Đang tải lên...</p>
+                  <p className='text-xs text-slate-500 mt-1'>Vui lòng chờ</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div
+                  className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 ${isDragging ? 'bg-primary/20 scale-110' : 'bg-slate-800'}`}
+                >
+                  <RiDragMove2Line
+                    className={`w-7 h-7 transition-colors ${isDragging ? 'text-primary' : 'text-slate-500'}`}
+                  />
+                </div>
+                <div>
+                  <p className='text-sm font-bold text-white'>
+                    {isDragging ? 'Thả ảnh vào đây!' : 'Kéo thả ảnh vào đây'}
+                  </p>
+                  <p className='text-xs text-slate-500 mt-1'>hoặc click để chọn từ máy tính</p>
+                  <p className='text-3xs text-slate-600 mt-2'>PNG, JPG, WEBP · Tối đa 5MB</p>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* URL input alternative */}
+      {!thumbnailUrl && !isUploading && (
+        <div className='flex items-center gap-3'>
+          <div className='flex-1 h-[1px] bg-slate-800' />
+          <span className='text-3xs text-slate-600 font-bold'>HOẶC NHẬP URL</span>
+          <div className='flex-1 h-[1px] bg-slate-800' />
+        </div>
+      )}
+      {!thumbnailUrl && !isUploading && (
+        <input
+          type='url'
+          placeholder='https://example.com/thumbnail.jpg'
+          onBlur={(e) => {
+            if (e.target.value.startsWith('http')) onUrlChange(e.target.value);
+          }}
+          className='w-full py-3 px-4 bg-slate-950/40 border border-slate-800 focus:border-primary/50 text-xs text-white placeholder-slate-700 rounded-xl focus:outline-none transition-all'
+        />
+      )}
+
+      {uploadError && (
+        <div className='flex items-center gap-2 text-red-400 text-xs font-semibold bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3'>
+          <span>⚠️</span>
+          <span>{uploadError}</span>
+        </div>
+      )}
+
+      <input
+        ref={inputRef}
+        type='file'
+        id={inputId}
+        accept='image/*'
+        onChange={handleFileChange}
+        className='hidden'
+      />
+    </div>
+  );
+}
+
+// ─── Category Selector ───────────────────────────────────────────────────────
+function CategorySelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className='grid grid-cols-2 sm:grid-cols-3 gap-2'>
+      {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
+        <button
+          key={key}
+          type='button'
+          onClick={() => onChange(key)}
+          className={`flex items-center gap-2 px-3 py-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+            value === key
+              ? 'bg-primary text-white border-primary shadow-md shadow-primary/20'
+              : 'bg-slate-900/40 border-slate-800 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+          }`}
+        >
+          {cfg.icon}
+          <span>{cfg.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Main Component ──────────────────────────────────────────────────────────
+export default function DashboardClient({
+  initialTemplates,
+  initialContactSettings,
+  initialLeads,
+  initialPricingPlans,
+}: DashboardClientProps) {
+  const router = useRouter();
+  const [templates, setTemplates] = useState<TemplateData[]>(initialTemplates);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState<'all' | string>('all');
+
+  // ── Contact settings state ──
+  const [activeTab, setActiveTab] = useState<'templates' | 'contact' | 'leads' | 'pricing'>(
+    'templates',
+  );
+  const [contactHotline, setContactHotline] = useState(initialContactSettings.hotline);
+  const [contactZaloId, setContactZaloId] = useState(initialContactSettings.zaloId);
+  const [contactMessengerId, setContactMessengerId] = useState(initialContactSettings.messengerId);
+  const [isSavingContact, setIsSavingContact] = useState(false);
+  const [saveContactError, setSaveContactError] = useState<string | null>(null);
+  const [saveContactSuccess, setSaveContactSuccess] = useState(false);
+
+  // ── Leads state ──
+  const [leads, setLeads] = useState<ContactLead[]>(initialLeads);
+  const [isDeletingLead, setIsDeletingLead] = useState<string | number | null>(null);
+  const [isTogglingLead, setIsTogglingLead] = useState<string | number | null>(null);
+  const [activeStatusFilter, setActiveStatusFilter] = useState<'all' | 'pending' | 'completed'>(
+    'all',
+  );
+
+  // ── Pricing states ──
+  const [plans, setPlans] = useState<PricingPlan[]>(initialPricingPlans);
+  const [editingPlan, setEditingPlan] = useState<PricingPlan | null>(null);
+  const [isCreatePlanOpen, setIsCreatePlanOpen] = useState(false);
+  const [isSavingPlan, setIsSavingPlan] = useState(false);
+
+  // Edit plan form states
+  const [editPlanNameVi, setEditPlanNameVi] = useState('');
+  const [editPlanNameEn, setEditPlanNameEn] = useState('');
+  const [editPlanDescVi, setEditPlanDescVi] = useState('');
+  const [editPlanDescEn, setEditPlanDescEn] = useState('');
+  const [editPlanPriceVi, setEditPlanPriceVi] = useState('');
+  const [editPlanPriceEn, setEditPlanPriceEn] = useState('');
+  const [editPlanPeriodVi, setEditPlanPeriodVi] = useState('');
+  const [editPlanPeriodEn, setEditPlanPeriodEn] = useState('');
+  const [editPlanFeaturesVi, setEditPlanFeaturesVi] = useState('');
+  const [editPlanFeaturesEn, setEditPlanFeaturesEn] = useState('');
+  const [editPlanIsPopular, setEditPlanIsPopular] = useState(false);
+  const [editPlanButtonVariant, setEditPlanButtonVariant] = useState<'outline' | 'default'>(
+    'outline',
+  );
+  const [editPlanSortOrder, setEditPlanSortOrder] = useState(0);
+  const [editPlanLangTab, setEditPlanLangTab] = useState<'vi' | 'en'>('vi');
+
+  // Create plan form states
+  const [newPlanKey, setNewPlanKey] = useState('');
+  const [newPlanNameVi, setNewPlanNameVi] = useState('');
+  const [newPlanNameEn, setNewPlanNameEn] = useState('');
+  const [newPlanDescVi, setNewPlanDescVi] = useState('');
+  const [newPlanDescEn, setNewPlanDescEn] = useState('');
+  const [newPlanPriceVi, setNewPlanPriceVi] = useState('');
+  const [newPlanPriceEn, setNewPlanPriceEn] = useState('');
+  const [newPlanPeriodVi, setNewPlanPeriodVi] = useState('');
+  const [newPlanPeriodEn, setNewPlanPeriodEn] = useState('');
+  const [newPlanFeaturesVi, setNewPlanFeaturesVi] = useState('');
+  const [newPlanFeaturesEn, setNewPlanFeaturesEn] = useState('');
+  const [newPlanIsPopular, setNewPlanIsPopular] = useState(false);
+  const [newPlanButtonVariant, setNewPlanButtonVariant] = useState<'outline' | 'default'>(
+    'outline',
+  );
+  const [newPlanSortOrder, setNewPlanSortOrder] = useState(10);
+  const [newPlanLangTab, setNewPlanLangTab] = useState<'vi' | 'en'>('vi');
+
+  const openEditPlanModal = (plan: PricingPlan) => {
+    setEditingPlan(plan);
+    setEditPlanNameVi(plan.nameVi);
+    setEditPlanNameEn(plan.nameEn);
+    setEditPlanDescVi(plan.descVi || '');
+    setEditPlanDescEn(plan.descEn || '');
+    setEditPlanPriceVi(plan.priceVi);
+    setEditPlanPriceEn(plan.priceEn);
+    setEditPlanPeriodVi(plan.periodVi || '');
+    setEditPlanPeriodEn(plan.periodEn || '');
+    setEditPlanFeaturesVi(plan.featuresVi.join('\n'));
+    setEditPlanFeaturesEn(plan.featuresEn.join('\n'));
+    setEditPlanIsPopular(plan.isPopular);
+    setEditPlanButtonVariant(plan.buttonVariant);
+    setEditPlanSortOrder(plan.sortOrder);
+    setEditPlanLangTab('vi');
+  };
+
+  const closeEditPlanModal = () => setEditingPlan(null);
+
+  const openCreatePlanModal = () => {
+    setNewPlanKey('');
+    setNewPlanNameVi('');
+    setNewPlanNameEn('');
+    setNewPlanDescVi('');
+    setNewPlanDescEn('');
+    setNewPlanPriceVi('');
+    setNewPlanPriceEn('');
+    setNewPlanPeriodVi('');
+    setNewPlanPeriodEn('');
+    setNewPlanFeaturesVi('');
+    setNewPlanFeaturesEn('');
+    setNewPlanIsPopular(false);
+    setNewPlanButtonVariant('outline');
+    setNewPlanSortOrder((plans.length + 1) * 10);
+    setNewPlanLangTab('vi');
+    setIsCreatePlanOpen(true);
+  };
+
+  const closeCreatePlanModal = () => setIsCreatePlanOpen(false);
+
+  const handleSavePlan = async () => {
+    if (!editingPlan) return;
+    setIsSavingPlan(true);
+    try {
+      const updated: Partial<PricingPlan> = {
+        nameVi: editPlanNameVi.trim(),
+        nameEn: editPlanNameEn.trim(),
+        descVi: editPlanDescVi.trim() || null,
+        descEn: editPlanDescEn.trim() || null,
+        priceVi: editPlanPriceVi.trim(),
+        priceEn: editPlanPriceEn.trim(),
+        periodVi: editPlanPeriodVi.trim() || null,
+        periodEn: editPlanPeriodEn.trim() || null,
+        featuresVi: editPlanFeaturesVi
+          .split('\n')
+          .map((f) => f.trim())
+          .filter(Boolean),
+        featuresEn: editPlanFeaturesEn
+          .split('\n')
+          .map((f) => f.trim())
+          .filter(Boolean),
+        isPopular: editPlanIsPopular,
+        buttonVariant: editPlanButtonVariant,
+        sortOrder: Number(editPlanSortOrder),
+      };
+
+      const res = await savePricingPlanAction(editingPlan.key, updated);
+      if (res.success) {
+        setPlans((prev) =>
+          prev
+            .map((p) => (p.key === editingPlan.key ? { ...p, ...updated } : p))
+            .sort((a, b) => a.sortOrder - b.sortOrder),
+        );
+        closeEditPlanModal();
+        router.refresh();
+      } else {
+        alert(res.error || 'Cập nhật thất bại');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi hệ thống khi cập nhật gói');
+    } finally {
+      setIsSavingPlan(false);
+    }
+  };
+
+  const handleCreatePlan = async () => {
+    if (!newPlanKey || !newPlanNameVi || !newPlanNameEn || !newPlanPriceVi || !newPlanPriceEn) {
+      alert('Vui lòng điền đầy đủ các thông tin bắt buộc');
+      return;
+    }
+    setIsSavingPlan(true);
+    try {
+      const newPlan: PricingPlan = {
+        key: newPlanKey.toLowerCase().trim(),
+        nameVi: newPlanNameVi.trim(),
+        nameEn: newPlanNameEn.trim(),
+        descVi: newPlanDescVi.trim() || null,
+        descEn: newPlanDescEn.trim() || null,
+        priceVi: newPlanPriceVi.trim(),
+        priceEn: newPlanPriceEn.trim(),
+        periodVi: newPlanPeriodVi.trim() || null,
+        periodEn: newPlanPeriodEn.trim() || null,
+        featuresVi: newPlanFeaturesVi
+          .split('\n')
+          .map((f) => f.trim())
+          .filter(Boolean),
+        featuresEn: newPlanFeaturesEn
+          .split('\n')
+          .map((f) => f.trim())
+          .filter(Boolean),
+        isPopular: newPlanIsPopular,
+        buttonVariant: newPlanButtonVariant,
+        sortOrder: Number(newPlanSortOrder),
+      };
+
+      const res = await createPricingPlanAction(newPlan);
+      if (res.success) {
+        setPlans((prev) => [...prev, newPlan].sort((a, b) => a.sortOrder - b.sortOrder));
+        closeCreatePlanModal();
+        router.refresh();
+      } else {
+        alert(res.error || 'Thêm gói thất bại');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi hệ thống khi thêm gói');
+    } finally {
+      setIsSavingPlan(false);
+    }
+  };
+
+  const handleDeletePlan = async (key: string) => {
+    if (!window.confirm(`Xóa gói dịch vụ "${key.toUpperCase()}"? Không thể hoàn tác!`)) return;
+    try {
+      const res = await deletePricingPlanAction(key);
+      if (res.success) {
+        setPlans((prev) => prev.filter((p) => p.key !== key));
+        router.refresh();
+      } else {
+        alert(res.error || 'Xóa gói thất bại');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi hệ thống khi xóa gói');
+    }
+  };
+
+  const handleDeleteLead = async (id: string | number) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa yêu cầu tư vấn này?')) return;
+    setIsDeletingLead(id);
+    try {
+      const res = await deleteContactLeadAction(id);
+      if (res.success) {
+        setLeads((prev) => prev.filter((l) => l.id !== id));
+        router.refresh();
+      } else {
+        alert(res.error || 'Xóa thất bại');
+      }
+    } catch (err) {
+      console.error('Delete lead error:', err);
+      alert('Lỗi hệ thống khi xóa yêu cầu');
+    } finally {
+      setIsDeletingLead(null);
+    }
+  };
+
+  const handleToggleLeadStatus = async (
+    id: string | number,
+    currentStatus?: 'pending' | 'completed',
+  ) => {
+    const nextStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+    setIsTogglingLead(id);
+    try {
+      const res = await updateContactLeadStatusAction(id, nextStatus);
+      if (res.success) {
+        setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status: nextStatus } : l)));
+        router.refresh();
+      } else {
+        alert(res.error || 'Cập nhật trạng thái thất bại');
+      }
+    } catch (err) {
+      console.error('Toggle lead status error:', err);
+      alert('Lỗi hệ thống khi cập nhật trạng thái');
+    } finally {
+      setIsTogglingLead(null);
+    }
+  };
+
+  const filteredLeads = useMemo(() => {
+    return leads.filter((l) => {
+      if (activeStatusFilter === 'all') return true;
+      const status = l.status || 'pending';
+      return status === activeStatusFilter;
+    });
+  }, [leads, activeStatusFilter]);
+
+  const handleSaveContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingContact(true);
+    setSaveContactError(null);
+    setSaveContactSuccess(false);
+
+    try {
+      const res = await saveContactSettingsAction({
+        hotline: contactHotline.trim(),
+        zaloId: contactZaloId.trim(),
+        messengerId: contactMessengerId.trim(),
+      });
+
+      if (res.success) {
+        setSaveContactSuccess(true);
+        setTimeout(() => setSaveContactSuccess(false), 3000);
+        router.refresh();
+      } else {
+        setSaveContactError(res.error || 'Lưu cấu hình thất bại');
+      }
+    } catch (err) {
+      console.error('Save contact error:', err);
+      setSaveContactError('Đã xảy ra lỗi hệ thống khi lưu cấu hình');
+    } finally {
+      setIsSavingContact(false);
+    }
+  };
+
+  // ── Edit modal state ──
+  const [editingTemplate, setEditingTemplate] = useState<TemplateData | null>(null);
+  const [editCategory, setEditCategory] = useState<string>('sales');
+  const [editDemoPath, setEditDemoPath] = useState('');
+  const [editThumbnailUrl, setEditThumbnailUrl] = useState<string | null>(null);
+  const [editTitleVi, setEditTitleVi] = useState<string>('');
+  const [editTitleEn, setEditTitleEn] = useState<string>('');
+  const [editDescVi, setEditDescVi] = useState<string>('');
+  const [editDescEn, setEditDescEn] = useState<string>('');
+  const [editLangTab, setEditLangTab] = useState<'vi' | 'en'>('vi');
+
+  // ── Create wizard state ──
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [wizardStep, setWizardStep] = useState(1);
+  const [newKey, setNewKey] = useState('');
+  const [newCategory, setNewCategory] = useState('sales');
+  const [newDemoPath, setNewDemoPath] = useState('');
+  const [newThumbnailUrl, setNewThumbnailUrl] = useState<string | null>(null);
+  const [newTitleVi, setNewTitleVi] = useState('');
+  const [newTitleEn, setNewTitleEn] = useState('');
+  const [newDescVi, setNewDescVi] = useState('');
+  const [newDescEn, setNewDescEn] = useState('');
+  const [newLangTab, setNewLangTab] = useState<'vi' | 'en'>('vi');
+
+  // ── Upload state ──
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const [isPending, startTransition] = useTransition();
+
+  // ── Derived data ──
+  const categories = useMemo(() => {
+    const cats = new Set(templates.map((t) => t.category));
+    Object.keys(CATEGORY_CONFIG).forEach((c) => cats.add(c));
+    return ['all', ...Array.from(cats)];
+  }, [templates]);
+
+  const filteredTemplates = useMemo(() => {
+    return templates.filter((t) => {
+      const matchesSearch =
+        t.key.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.demoPath.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (t.titleVi && t.titleVi.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (t.titleEn && t.titleEn.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesCategory = activeCategoryFilter === 'all' || t.category === activeCategoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+  }, [templates, searchQuery, activeCategoryFilter]);
+
+  // ── Auth ──
+  const handleLogout = async () => {
+    await logoutAdmin();
+    router.refresh();
+    router.push('/admin/login');
+  };
+
+  // ── Upload helper ──
+  const handleFileUpload = async (file: File, type: 'new' | 'edit') => {
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      const formData = new FormData();
+      formData.append('thumbnail', file);
+      const res = await uploadThumbnailAction(formData);
+      if (res.success && res.url) {
+        if (type === 'new') setNewThumbnailUrl(res.url);
+        else setEditThumbnailUrl(res.url);
+      } else {
+        setUploadError(res.error || 'Tải ảnh lên thất bại');
+      }
+    } catch {
+      setUploadError('Có lỗi xảy ra khi upload tệp');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // ── Edit ──
+  const openEditModal = (template: TemplateData) => {
+    setEditingTemplate(template);
+    setEditCategory(template.category);
+    setEditDemoPath(template.demoPath);
+    setEditThumbnailUrl(template.thumbnailUrl);
+    setEditTitleVi(template.titleVi || '');
+    setEditTitleEn(template.titleEn || '');
+    setEditDescVi(template.descVi || '');
+    setEditDescEn(template.descEn || '');
+    setEditLangTab('vi');
+    setUploadError(null);
+  };
+
+  const closeEditModal = () => setEditingTemplate(null);
+
+  const handleSave = () => {
+    if (!editingTemplate) return;
+    startTransition(async () => {
+      const res = await saveTemplateAction(
+        editingTemplate.key,
+        editDemoPath,
+        editThumbnailUrl,
+        editTitleVi || null,
+        editTitleEn || null,
+        editDescVi || null,
+        editDescEn || null,
+        editCategory,
+      );
+      if (res.success) {
+        setTemplates((prev) =>
+          prev.map((t) =>
+            t.key === editingTemplate.key
+              ? {
+                  ...t,
+                  category: editCategory,
+                  demoPath: editDemoPath,
+                  thumbnailUrl: editThumbnailUrl,
+                  titleVi: editTitleVi || null,
+                  titleEn: editTitleEn || null,
+                  descVi: editDescVi || null,
+                  descEn: editDescEn || null,
+                }
+              : t,
+          ),
+        );
+        closeEditModal();
+        router.refresh();
+      } else {
+        alert(res.error || 'Lưu thay đổi thất bại');
+      }
+    });
+  };
+
+  // ── Create wizard ──
+  const openCreateModal = () => {
+    setNewKey('');
+    setNewCategory('sales');
+    setNewDemoPath('');
+    setNewThumbnailUrl(null);
+    setNewTitleVi('');
+    setNewTitleEn('');
+    setNewDescVi('');
+    setNewDescEn('');
+    setNewLangTab('vi');
+    setUploadError(null);
+    setWizardStep(1);
+    setIsCreateOpen(true);
+  };
+
+  const closeCreateModal = () => setIsCreateOpen(false);
+
+  const canGoNextStep1 = newKey.trim() !== '' && newDemoPath.trim() !== '';
+
+  const handleCreate = () => {
+    if (!newKey || !newDemoPath) return;
+    const newTemplate: TemplateData = {
+      key: newKey.toLowerCase().trim(),
+      category: newCategory,
+      demoPath: newDemoPath.trim(),
+      thumbnailUrl: newThumbnailUrl,
+      titleVi: newTitleVi.trim() || null,
+      titleEn: newTitleEn.trim() || null,
+      descVi: newDescVi.trim() || null,
+      descEn: newDescEn.trim() || null,
+    };
+    startTransition(async () => {
+      const res = await createTemplateAction(newTemplate);
+      if (res.success) {
+        setTemplates((prev) => [...prev, newTemplate]);
+        closeCreateModal();
+        router.refresh();
+      } else {
+        alert(res.error || 'Thêm mẫu website mới thất bại');
+      }
+    });
+  };
+
+  // ── Delete ──
+  const handleDelete = (key: string) => {
+    if (!window.confirm(`Xóa mẫu "${key.toUpperCase()}"? Không thể hoàn tác!`)) return;
+    startTransition(async () => {
+      const res = await deleteTemplateAction(key);
+      if (res.success) {
+        setTemplates((prev) => prev.filter((t) => t.key !== key));
+        router.refresh();
+      } else {
+        alert(res.error || 'Xóa thất bại');
+      }
+    });
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────────────────────
+  const isModalOpen = !!(isCreateOpen || editingTemplate);
+
+  return (
+    <div className='max-w-7xl mx-auto px-4 py-8 space-y-8 relative z-10'>
+      {/* Main dashboard content, hidden when a modal is open to avoid rendering lag */}
+      <div
+        className={`space-y-8 transition-all duration-200 ${isModalOpen ? 'invisible pointer-events-none' : ''}`}
+      >
+        {/* ── Top Navbar ── */}
+        <div className='flex items-center justify-between bg-slate-900/60 backdrop-blur-md border border-slate-800 rounded-3xl p-5 shadow-lg'>
+          <div className='flex items-center gap-3'>
+            <div className='w-10 h-10 rounded-xl bg-gradient-to-tr from-primary to-indigo-500 flex items-center justify-center text-white text-lg font-black shadow-lg'>
+              K
+            </div>
+            <div>
+              <h1 className='text-lg font-bold text-white leading-tight'>Katalin Admin</h1>
+              {/* <p className='text-3xs text-slate-400 uppercase tracking-widest font-extrabold'>
+                Mẫu Website & Portfolio
+              </p> */}
+            </div>
+          </div>
+          <button
+            onClick={handleLogout}
+            className='px-4 py-2 border border-red-500/30 bg-red-500/5 hover:bg-red-500/15 text-red-400 hover:text-red-300 text-xs font-bold rounded-xl flex items-center gap-2 cursor-pointer transition-all'
+          >
+            <RiLogoutBoxRLine className='w-4 h-4' />
+            Đăng xuất
+          </button>
+        </div>
+
+        {/* ── Tab Switcher ── */}
+        <div className='flex gap-1.5 border-b border-slate-800 pb-px mb-6 overflow-x-auto scrollbar-none'>
+          <button
+            onClick={() => setActiveTab('templates')}
+            className={`px-5 py-3 text-xs font-extrabold border-b-2 transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'templates'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <RiLayoutLine className='w-4 h-4' />
+            Danh sách website mẫu ({templates.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('contact')}
+            className={`px-5 py-3 text-xs font-extrabold border-b-2 transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'contact'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <RiSettings4Line className='w-4 h-4' />
+            Cấu hình liên hệ
+          </button>
+          <button
+            onClick={() => setActiveTab('leads')}
+            className={`px-5 py-3 text-xs font-extrabold border-b-2 transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'leads'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <RiPhoneLine className='w-4 h-4' />
+            Yêu cầu tư vấn ({leads.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('pricing')}
+            className={`px-5 py-3 text-xs font-extrabold border-b-2 transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'pricing'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <RiShoppingBag3Line className='w-4 h-4' />
+            Cấu hình bảng giá ({plans.length})
+          </button>
+        </div>
+
+        {activeTab === 'templates' && (
+          <>
+            {/* ── Stats Cards ── */}
+            <div className='grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4'>
+              {[
+                { label: 'Tổng số website', value: templates.length, color: 'text-white' },
+                {
+                  label: 'Có Thumbnail',
+                  value: templates.filter((t) => t.thumbnailUrl).length,
+                  color: 'text-primary',
+                },
+                {
+                  label: 'Giao diện (Theme)',
+                  value: templates.filter((t) => t.key.startsWith('theme')).length,
+                  color: 'text-amber-400',
+                },
+                {
+                  label: 'Dự án (Project)',
+                  value: templates.filter((t) => t.key.startsWith('proj')).length,
+                  color: 'text-emerald-400',
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className='bg-slate-900/40 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-1'
+                >
+                  <span className='text-3xs font-bold text-slate-400 uppercase tracking-wider block'>
+                    {stat.label}
+                  </span>
+                  <span className={`text-2xl font-black ${stat.color}`}>{stat.value}</span>
+                </div>
+              ))}
+              <div className='bg-slate-900/40 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-1 col-span-2 sm:col-span-1'>
+                <span className='text-3xs font-bold text-slate-400 uppercase tracking-wider block'>
+                  Lưu trữ
+                </span>
+                <span className='text-xs font-extrabold text-white flex items-center gap-1.5 pt-1.5'>
+                  {process.env.NEXT_PUBLIC_SUPABASE_URL ? (
+                    <>
+                      <span className='w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse' />
+                      Supabase Cloud
+                    </>
+                  ) : (
+                    <>
+                      <span className='w-2.5 h-2.5 rounded-full bg-amber-500' />
+                      Local JSON
+                    </>
+                  )}
+                </span>
+              </div>
+            </div>
+
+            {/* ── Toolbar ── */}
+            <div className='bg-slate-900/40 border border-slate-800 rounded-3xl p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4'>
+              {/* Search */}
+              <div className='relative flex-1 max-w-md'>
+                <RiSearchLine className='absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500' />
+                <input
+                  type='text'
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder='Tìm theo mã, tên hoặc link demo...'
+                  className='w-full py-2.5 pl-10.5 pr-4 bg-slate-950/40 border border-slate-800 focus:border-primary/50 text-sm text-white placeholder-slate-600 rounded-xl focus:outline-none transition-all'
+                />
+              </div>
+
+              <div className='flex flex-wrap items-center gap-2 w-full md:w-auto justify-between md:justify-end'>
+                {/* Category Tabs */}
+                <div className='flex flex-wrap gap-1.5'>
+                  {categories.map((cat) => {
+                    const cfg = getCatConfig(cat);
+                    return (
+                      <button
+                        key={cat}
+                        onClick={() => setActiveCategoryFilter(cat)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                          activeCategoryFilter === cat
+                            ? 'bg-primary text-white border-primary shadow-sm'
+                            : 'bg-slate-950/30 border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {cat === 'all' ? 'Tất cả' : cfg.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className='h-6 w-px bg-slate-800 hidden sm:block' />
+                {/* Add button */}
+                <button
+                  onClick={openCreateModal}
+                  className='px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-extrabold rounded-xl shadow-lg shadow-emerald-950/30 flex items-center gap-2 cursor-pointer transition-all'
+                >
+                  <RiAddLine className='w-4.5 h-4.5' />
+                  Thêm website mẫu
+                </button>
+              </div>
+            </div>
+
+            {/* ── Template Grid ── */}
+            <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+              {filteredTemplates.map((template) => {
+                const cfg = getCatConfig(template.category);
+                return (
+                  <div
+                    key={template.key}
+                    className='bg-slate-900/40 border border-slate-800/80 rounded-3xl overflow-hidden shadow-md flex flex-col hover:border-slate-700 transition-all group'
+                  >
+                    {/* Live scroll preview */}
+                    <div className='relative border-b border-slate-800 overflow-hidden'>
+                      <WebsiteLivePreview
+                        src={template.demoPath}
+                        thumbnailUrl={template.thumbnailUrl}
+                        alt={template.key}
+                        height={180}
+                        active={!isModalOpen}
+                      />
+                      <span
+                        className={`absolute top-3 left-3 z-20 border rounded-full px-2.5 py-1 text-4xs font-extrabold uppercase tracking-wider flex items-center gap-1 bg-slate-900/80 backdrop-blur-sm ${cfg.color}`}
+                      >
+                        {cfg.icon}
+                        {cfg.label}
+                      </span>
+                      <span className='absolute top-3 right-3 z-20 bg-slate-900/80 text-slate-300 font-mono text-3xs font-bold px-2 py-1 rounded-md border border-slate-700 backdrop-blur-sm'>
+                        {template.key.toUpperCase()}
+                      </span>
+                    </div>
+
+                    {/* Content */}
+                    <div className='p-5 flex-1 flex flex-col justify-between gap-4'>
+                      <div className='space-y-2.5'>
+                        <div>
+                          <h3 className='text-sm font-bold text-white line-clamp-1'>
+                            {template.titleVi || `[Code] ${template.key}`}
+                          </h3>
+                          <p className='text-xs text-slate-400 line-clamp-1 italic'>
+                            {template.titleEn || 'Chưa có tên tiếng Anh'}
+                          </p>
+                        </div>
+                        <div className='flex items-center gap-1.5 text-3xs text-slate-400 font-mono bg-slate-950/30 border border-slate-800/50 px-3 py-1.5 rounded-lg'>
+                          <RiLink className='w-3 h-3 flex-shrink-0' />
+                          <span className='line-clamp-1 select-all'>{template.demoPath}</span>
+                        </div>
+                      </div>
+
+                      <div className='flex gap-2 pt-3 border-t border-slate-800'>
+                        <button
+                          onClick={() => openEditModal(template)}
+                          className='flex-1 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-extrabold rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer'
+                        >
+                          <RiEditLine className='w-4 h-4' />
+                          Chỉnh sửa
+                        </button>
+                        <a
+                          href={template.demoPath}
+                          target='_blank'
+                          rel='noopener noreferrer'
+                          className='px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700/50 transition-all flex items-center justify-center cursor-pointer'
+                          title='Mở link demo'
+                        >
+                          <RiExternalLinkLine className='w-4 h-4' />
+                        </a>
+                        <button
+                          onClick={() => handleDelete(template.key)}
+                          className='px-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl border border-red-500/20 transition-all flex items-center justify-center cursor-pointer'
+                          title='Xóa'
+                        >
+                          <RiDeleteBinLine className='w-4 h-4' />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {filteredTemplates.length === 0 && (
+                <div className='col-span-full py-20 text-center text-slate-500 space-y-3 border border-dashed border-slate-800 rounded-3xl bg-slate-900/10'>
+                  <RiGlobalLine className='w-12 h-12 mx-auto text-slate-700' />
+                  <p className='text-sm font-semibold'>Không tìm thấy mẫu website nào</p>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {activeTab === 'contact' && (
+          /* ── Contact Settings Panel ── */
+          <div className='max-w-2xl mx-auto bg-slate-900/40 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-8 shadow-xl animate-fade-in'>
+            <div>
+              <h2 className='text-lg font-black text-white flex items-center gap-2'>
+                <RiSettings4Line className='w-5 h-5 text-primary' />
+                Cấu hình liên hệ
+              </h2>
+              <p className='text-xs text-slate-400 mt-1'>
+                Cấu hình số điện thoại Hotline, tài khoản Zalo và Facebook Messenger hiển thị trên
+                các bong bóng chat nổi.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveContact} className='space-y-6'>
+              {/* Hotline */}
+              <div className='space-y-2'>
+                <label className='text-xs font-extrabold text-slate-300 flex items-center gap-2'>
+                  <RiPhoneLine className='w-4 h-4 text-emerald-400' />
+                  Số điện thoại Hotline
+                </label>
+                <input
+                  type='text'
+                  value={contactHotline}
+                  onChange={(e) => setContactHotline(e.target.value)}
+                  placeholder='Ví dụ: 0900000000'
+                  className='w-full py-3.5 px-4 bg-slate-950/40 border border-slate-800 focus:border-primary/60 text-sm text-white placeholder-slate-700 rounded-xl focus:outline-none transition-all'
+                  required
+                />
+                <p className='text-3xs text-slate-500'>
+                  Số điện thoại nhận cuộc gọi trực tiếp khi khách hàng nhấn nút Hotline.
+                </p>
+              </div>
+
+              {/* Zalo SĐT */}
+              <div className='space-y-2'>
+                <label className='text-xs font-extrabold text-slate-300 flex items-center gap-2'>
+                  <span className='w-4 h-4 rounded bg-blue-500/10 text-blue-400 text-3xs font-black flex items-center justify-center border border-blue-500/20'>
+                    Z
+                  </span>
+                  Hotline Zalo (SĐT hoặc Zalo ID)
+                </label>
+                <input
+                  type='text'
+                  value={contactZaloId}
+                  onChange={(e) => setContactZaloId(e.target.value)}
+                  placeholder='Ví dụ: 0900000000'
+                  className='w-full py-3.5 px-4 bg-slate-950/40 border border-slate-800 focus:border-primary/60 text-sm text-white placeholder-slate-700 rounded-xl focus:outline-none transition-all'
+                  required
+                />
+                <p className='text-3xs text-slate-500'>
+                  Số điện thoại đăng ký Zalo hoặc QR ID để mở trực tiếp khung chat Zalo.
+                </p>
+              </div>
+
+              {/* Messenger Username */}
+              <div className='space-y-2'>
+                <label className='text-xs font-extrabold text-slate-300 flex items-center gap-2'>
+                  <RiMessengerLine className='w-4 h-4 text-purple-400' />
+                  Facebook Messenger ID (Username)
+                </label>
+                <input
+                  type='text'
+                  value={contactMessengerId}
+                  onChange={(e) => setContactMessengerId(e.target.value)}
+                  placeholder='Ví dụ: katalinsolutions'
+                  className='w-full py-3.5 px-4 bg-slate-950/40 border border-slate-800 focus:border-primary/60 text-sm text-white placeholder-slate-700 rounded-xl focus:outline-none transition-all'
+                  required
+                />
+                <p className='text-3xs text-slate-500'>
+                  Tên định danh (username) của Trang Fanpage Facebook để mở trực tiếp khung chat
+                  Messenger.
+                </p>
+              </div>
+
+              {/* Status Feedback */}
+              {saveContactError && (
+                <div className='p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 font-semibold'>
+                  ⚠️ {saveContactError}
+                </div>
+              )}
+
+              {saveContactSuccess && (
+                <div className='p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-400 font-bold flex items-center gap-1.5 animate-pulse'>
+                  <RiCheckLine className='w-4 h-4' />
+                  Lưu cấu hình thành công! Thông tin ngoài trang chủ đã được cập nhật.
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                type='submit'
+                disabled={isSavingContact}
+                className='w-full py-3.5 bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-extrabold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 cursor-pointer'
+              >
+                {isSavingContact ? (
+                  <>
+                    <RiLoader4Line className='w-4 h-4 animate-spin' />
+                    Đang lưu cấu hình...
+                  </>
+                ) : (
+                  <>
+                    <RiCheckLine className='w-4 h-4' />
+                    Lưu cấu hình
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {activeTab === 'leads' && (
+          /* ── Consultation Leads Panel ── */
+          <div className='bg-slate-900/40 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl animate-fade-in'>
+            <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/60 pb-5'>
+              <div>
+                <h2 className='text-lg font-black text-white flex items-center gap-2'>
+                  <RiPhoneLine className='w-5 h-5 text-primary' />
+                  Yêu cầu tư vấn từ khách hàng
+                </h2>
+                <p className='text-xs text-slate-400 mt-1'>
+                  Danh sách khách hàng đã điền thông tin và gửi yêu cầu tư vấn liên hệ trên website.
+                </p>
+              </div>
+              <span className='bg-slate-800/80 text-slate-300 font-mono text-xs font-bold px-3 py-1.5 rounded-xl border border-slate-700/50 self-start sm:self-center'>
+                Tổng số: {leads.length} yêu cầu
+              </span>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className='flex flex-wrap gap-2 pb-2'>
+              {(['all', 'pending', 'completed'] as const).map((status) => (
+                <button
+                  key={status}
+                  type='button'
+                  onClick={() => setActiveStatusFilter(status)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                    activeStatusFilter === status
+                      ? 'bg-primary border-primary text-white shadow-md'
+                      : 'bg-slate-950/30 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                  }`}
+                >
+                  {status === 'all' && `Tất cả (${leads.length})`}
+                  {status === 'pending' &&
+                    `Chưa tư vấn (${leads.filter((l) => (l.status || 'pending') === 'pending').length})`}
+                  {status === 'completed' &&
+                    `Đã tư vấn (${leads.filter((l) => l.status === 'completed').length})`}
+                </button>
+              ))}
+            </div>
+
+            {filteredLeads.length === 0 ? (
+              <div className='py-20 text-center text-slate-500 space-y-3 border border-dashed border-slate-800 rounded-2xl bg-slate-900/10'>
+                <RiPhoneLine className='w-12 h-12 mx-auto text-slate-700 animate-pulse' />
+                <div>
+                  <p className='text-sm font-semibold text-slate-400'>
+                    Không tìm thấy yêu cầu tư vấn nào
+                  </p>
+                  <p className='text-xs text-slate-600 mt-1'>
+                    Không có yêu cầu phù hợp với bộ lọc hiện tại.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className='overflow-x-auto -mx-6 sm:mx-0'>
+                <div className='inline-block min-w-full align-middle px-6 sm:px-0'>
+                  <div className='overflow-hidden border border-slate-800/60 rounded-2xl bg-slate-950/20'>
+                    <table className='min-w-full divide-y divide-slate-800/60 text-left text-xs'>
+                      <thead className='bg-slate-900/80 text-slate-400 font-bold uppercase tracking-wider text-3xs border-b border-slate-800/60'>
+                        <tr>
+                          <th className='px-6 py-4'>Khách hàng</th>
+                          <th className='px-6 py-4'>Liên hệ</th>
+                          <th className='px-6 py-4'>Trạng thái</th>
+                          <th className='px-6 py-4'>Nội dung tin nhắn</th>
+                          <th className='px-6 py-4'>Thời gian</th>
+                          <th className='px-6 py-4 text-center'>Thao tác</th>
+                        </tr>
+                      </thead>
+                      <tbody className='divide-y divide-slate-800/40 text-slate-300'>
+                        {filteredLeads.map((lead) => (
+                          <tr
+                            key={lead.id}
+                            className='hover:bg-slate-900/30 transition-colors duration-150'
+                          >
+                            <td className='px-6 py-4.5 whitespace-nowrap font-bold text-white'>
+                              {lead.name}
+                            </td>
+                            <td className='px-6 py-4.5 whitespace-nowrap space-y-1'>
+                              <div className='flex items-center gap-2'>
+                                <span className='font-bold text-white'>{lead.phone}</span>
+                                <a
+                                  href={`tel:${lead.phone}`}
+                                  className='p-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg border border-emerald-500/20 transition-all flex items-center justify-center'
+                                  title='Gọi điện trực tiếp'
+                                >
+                                  <RiPhoneFill className='w-3.5 h-3.5' />
+                                </a>
+                              </div>
+                              <div className='text-3xs text-slate-500 font-mono'>{lead.email}</div>
+                            </td>
+                            <td className='px-6 py-4.5 whitespace-nowrap'>
+                              {lead.status === 'completed' ? (
+                                <span className='inline-flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-3xs font-extrabold px-2.5 py-1 rounded-full'>
+                                  <RiCheckLine className='w-3.5 h-3.5' />
+                                  Đã tư vấn
+                                </span>
+                              ) : (
+                                <span className='inline-flex items-center gap-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-3xs font-extrabold px-2.5 py-1 rounded-full'>
+                                  <RiTimeLine className='w-3.5 h-3.5' />
+                                  Chưa tư vấn
+                                </span>
+                              )}
+                            </td>
+                            <td className='px-6 py-4.5 max-w-sm'>
+                              <p
+                                className='whitespace-pre-line text-slate-300 line-clamp-3 leading-relaxed'
+                                title={lead.message}
+                              >
+                                {lead.message || '—'}
+                              </p>
+                            </td>
+                            <td className='px-6 py-4.5 whitespace-nowrap text-slate-400 font-mono text-3xs'>
+                              {lead.createdAt
+                                ? new Date(lead.createdAt).toLocaleString('vi-VN', {
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit',
+                                  })
+                                : '—'}
+                            </td>
+                            <td className='px-6 py-4.5 whitespace-nowrap text-center space-x-1.5'>
+                              <button
+                                onClick={() =>
+                                  lead.id && handleToggleLeadStatus(lead.id, lead.status)
+                                }
+                                disabled={isTogglingLead === lead.id || isDeletingLead === lead.id}
+                                className={`p-2 rounded-lg border transition-all cursor-pointer inline-flex items-center justify-center ${
+                                  lead.status === 'completed'
+                                    ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/20'
+                                    : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/20'
+                                }`}
+                                title={
+                                  lead.status === 'completed'
+                                    ? 'Đánh dấu chưa tư vấn'
+                                    : 'Đánh dấu đã tư vấn'
+                                }
+                              >
+                                {isTogglingLead === lead.id ? (
+                                  <RiLoader4Line className='w-4 h-4 animate-spin' />
+                                ) : lead.status === 'completed' ? (
+                                  <RiCloseLine className='w-4 h-4' />
+                                ) : (
+                                  <RiCheckLine className='w-4 h-4' />
+                                )}
+                              </button>
+                              <button
+                                onClick={() => lead.id && handleDeleteLead(lead.id)}
+                                disabled={isDeletingLead === lead.id || isTogglingLead === lead.id}
+                                className='p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-lg border border-red-500/20 transition-all cursor-pointer inline-flex items-center justify-center'
+                                title='Xóa yêu cầu'
+                              >
+                                {isDeletingLead === lead.id ? (
+                                  <RiLoader4Line className='w-4 h-4 animate-spin' />
+                                ) : (
+                                  <RiDeleteBinLine className='w-4 h-4' />
+                                )}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'pricing' && (
+          /* ── Pricing Config Panel ── */
+          <div className='bg-slate-900/40 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl animate-fade-in'>
+            <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/60 pb-5'>
+              <div>
+                <h2 className='text-lg font-black text-white flex items-center gap-2'>
+                  <RiShoppingBag3Line className='w-5 h-5 text-primary' />
+                  Cấu hình bảng giá các gói dịch vụ
+                </h2>
+                <p className='text-xs text-slate-400 mt-1'>
+                  Quản lý danh sách các gói dịch vụ, giá tiền, tính năng hiển thị trên trang chủ.
+                </p>
+              </div>
+              <button
+                onClick={openCreatePlanModal}
+                className='px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-extrabold rounded-xl shadow-lg shadow-emerald-950/30 flex items-center gap-2 cursor-pointer transition-all self-start sm:self-center'
+              >
+                <RiAddLine className='w-4.5 h-4.5' />
+                Thêm gói dịch vụ
+              </button>
+            </div>
+
+            {plans.length === 0 ? (
+              <div className='py-20 text-center text-slate-500 space-y-3 border border-dashed border-slate-800 rounded-2xl bg-slate-900/10'>
+                <RiShoppingBag3Line className='w-12 h-12 mx-auto text-slate-700 animate-pulse' />
+                <div>
+                  <p className='text-sm font-semibold text-slate-400'>Chưa có gói dịch vụ nào</p>
+                  <p className='text-xs text-slate-600 mt-1'>
+                    Nhấp vào nút &quot;Thêm gói dịch vụ&quot; để bắt đầu.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className='overflow-x-auto -mx-6 sm:mx-0'>
+                <div className='inline-block min-w-full align-middle px-6 sm:px-0'>
+                  <div className='overflow-hidden border border-slate-800/60 rounded-2xl bg-slate-950/20'>
+                    <table className='min-w-full divide-y divide-slate-800/60 text-left text-xs'>
+                      <thead className='bg-slate-900/80 text-slate-400 font-bold uppercase tracking-wider text-3xs border-b border-slate-800/60'>
+                        <tr>
+                          <th className='px-6 py-4'>Mã (Key)</th>
+                          <th className='px-6 py-4'>Tên gói (VI / EN)</th>
+                          <th className='px-6 py-4'>Giá & Chu kỳ (VI / EN)</th>
+                          <th className='px-6 py-4'>Trạng thái</th>
+                          <th className='px-6 py-4'>Thứ tự</th>
+                          <th className='px-6 py-4 text-center'>Thao tác</th>
+                        </tr>
+                      </thead>
+                      <tbody className='divide-y divide-slate-800/40 text-slate-300'>
+                        {plans.map((plan) => (
+                          <tr
+                            key={plan.key}
+                            className='hover:bg-slate-900/30 transition-colors duration-150'
+                          >
+                            <td className='px-6 py-4.5 whitespace-nowrap font-mono font-bold text-white'>
+                              {plan.key.toUpperCase()}
+                            </td>
+                            <td className='px-6 py-4.5 space-y-1'>
+                              <div className='font-bold text-white'>{plan.nameVi}</div>
+                              <div className='text-3xs text-slate-500 italic'>{plan.nameEn}</div>
+                            </td>
+                            <td className='px-6 py-4.5 space-y-1'>
+                              <div className='font-bold text-white'>
+                                {plan.priceVi} {plan.periodVi && `/ ${plan.periodVi}`}
+                              </div>
+                              <div className='text-3xs text-slate-500 italic'>
+                                {plan.priceEn} {plan.periodEn && `/ ${plan.periodEn}`}
+                              </div>
+                            </td>
+                            <td className='px-6 py-4.5 whitespace-nowrap'>
+                              {plan.isPopular ? (
+                                <span className='inline-flex items-center gap-1 bg-primary/10 border border-primary/20 text-primary text-3xs font-extrabold px-2.5 py-1 rounded-full'>
+                                  ★ Bán chạy nhất
+                                </span>
+                              ) : (
+                                <span className='inline-flex items-center gap-1 bg-slate-800 border border-slate-700 text-slate-400 text-3xs font-extrabold px-2.5 py-1 rounded-full'>
+                                  Tiêu chuẩn
+                                </span>
+                              )}
+                            </td>
+                            <td className='px-6 py-4.5 whitespace-nowrap font-mono text-slate-400'>
+                              {plan.sortOrder}
+                            </td>
+                            <td className='px-6 py-4.5 whitespace-nowrap text-center space-x-1.5'>
+                              <button
+                                onClick={() => openEditPlanModal(plan)}
+                                className='p-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg border border-primary/20 transition-all cursor-pointer inline-flex items-center justify-center'
+                                title='Sửa gói'
+                              >
+                                <RiEditLine className='w-4 h-4' />
+                              </button>
+                              <button
+                                onClick={() => handleDeletePlan(plan.key)}
+                                className='p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-lg border border-red-500/20 transition-all cursor-pointer inline-flex items-center justify-center'
+                                title='Xóa gói'
+                              >
+                                <RiDeleteBinLine className='w-4 h-4' />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ════════════════════════════════════════════════════════════════════
+          CREATE WIZARD MODAL
+      ═══════════════════════════════════════════════════════════════════════ */}
+      {isCreateOpen && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95'>
+          <div className='w-full max-w-2xl bg-[#0f1728] border border-slate-800 rounded-3xl shadow-[0_30px_60px_-10px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col max-h-[92vh]'>
+            {/* Wizard Header */}
+            <div className='px-8 pt-8 pb-6 border-b border-slate-800/80 flex-shrink-0'>
+              <div className='flex items-start justify-between mb-6'>
+                <div>
+                  <h2 className='text-xl font-black text-white'>Thêm website mẫu mới</h2>
+                  <p className='text-xs text-slate-500 mt-1'>
+                    Bước {wizardStep} / {STEPS.length} — {STEPS[wizardStep - 1].label}
+                  </p>
+                </div>
+                <button
+                  onClick={closeCreateModal}
+                  className='p-2 rounded-full hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer flex-shrink-0'
+                >
+                  <RiCloseLine className='w-5 h-5' />
+                </button>
+              </div>
+
+              {/* Step Progress Bar */}
+              <div className='flex items-center gap-2'>
+                {STEPS.map((step, i) => (
+                  <div key={step.id} className='flex items-center gap-2 flex-1'>
+                    <div className='flex flex-col items-center gap-1.5 w-full'>
+                      <div className={`w-full relative flex items-center justify-center`}>
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold border-2 transition-all duration-500 z-10 ${
+                            wizardStep > step.id
+                              ? 'bg-emerald-500 border-emerald-500 text-white'
+                              : wizardStep === step.id
+                                ? 'bg-primary border-primary text-white shadow-lg shadow-primary/30'
+                                : 'bg-slate-900 border-slate-700 text-slate-500'
+                          }`}
+                        >
+                          {wizardStep > step.id ? <RiCheckLine className='w-4 h-4' /> : step.icon}
+                        </div>
+                      </div>
+                      <span
+                        className={`text-3xs font-bold whitespace-nowrap ${
+                          wizardStep === step.id ? 'text-primary' : 'text-slate-600'
+                        }`}
+                      >
+                        {step.label}
+                      </span>
+                    </div>
+                    {i < STEPS.length - 1 && (
+                      <div
+                        className={`h-0.5 flex-1 mb-5 transition-all duration-500 ${
+                          wizardStep > step.id ? 'bg-emerald-500' : 'bg-slate-800'
+                        }`}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Step Content */}
+            <div className='flex-1 overflow-y-auto px-8 py-7'>
+              {/* ── Step 1: Thông tin cơ bản ── */}
+              {wizardStep === 1 && (
+                <div className='space-y-6'>
+                  {/* Key */}
+                  <div className='space-y-2'>
+                    <label className='text-xs font-extrabold text-slate-300 flex items-center gap-2'>
+                      <span className='w-5 h-5 rounded-md bg-primary/20 text-primary text-3xs font-black flex items-center justify-center'>
+                        1
+                      </span>
+                      Mã định danh (Key) <span className='text-red-400'>*</span>
+                    </label>
+                    <div className='relative'>
+                      <input
+                        type='text'
+                        value={newKey}
+                        onChange={(e) => setNewKey(e.target.value)}
+                        placeholder='Ví dụ: theme7, landing-spa, proj4'
+                        className='w-full py-3.5 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white placeholder-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all font-mono'
+                      />
+                      {newKey && !/^[a-zA-Z0-9_-]+$/.test(newKey) && (
+                        <p className='text-xs text-red-400 mt-1.5 flex items-center gap-1'>
+                          ⚠️ Chỉ dùng chữ cái, số, gạch ngang (-) và gạch dưới (_)
+                        </p>
+                      )}
+                    </div>
+                    <p className='text-3xs text-slate-600'>
+                      Mã này sẽ là đường dẫn preview:{' '}
+                      <span className='text-slate-400 font-mono'>
+                        /preview/<span className='text-primary'>{newKey || 'key'}</span>
+                      </span>
+                    </p>
+                  </div>
+
+                  {/* Demo Link */}
+                  <div className='space-y-2'>
+                    <label className='text-xs font-extrabold text-slate-300 flex items-center gap-2'>
+                      <span className='w-5 h-5 rounded-md bg-primary/20 text-primary text-3xs font-black flex items-center justify-center'>
+                        2
+                      </span>
+                      Link website demo <span className='text-red-400'>*</span>
+                    </label>
+                    <input
+                      type='url'
+                      value={newDemoPath}
+                      onChange={(e) => setNewDemoPath(e.target.value)}
+                      placeholder='https://example.com/your-template'
+                      className='w-full py-3.5 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white placeholder-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all'
+                    />
+                    {/* URL Live Preview */}
+                    {newDemoPath.startsWith('http') && (
+                      <div className='mt-3 rounded-xl border border-slate-800 overflow-hidden'>
+                        <div className='bg-slate-900 px-4 py-2.5 flex items-center gap-2 border-b border-slate-800'>
+                          <div className='flex gap-1.5'>
+                            <span className='w-2.5 h-2.5 rounded-full bg-red-500/70' />
+                            <span className='w-2.5 h-2.5 rounded-full bg-yellow-500/70' />
+                            <span className='w-2.5 h-2.5 rounded-full bg-green-500/70' />
+                          </div>
+                          <span className='flex-1 text-center text-3xs text-slate-500 font-mono truncate'>
+                            {newDemoPath}
+                          </span>
+                        </div>
+                        <iframe
+                          src={newDemoPath}
+                          className='w-full h-48 border-none bg-white'
+                          title='URL Preview'
+                          loading='lazy'
+                          sandbox='allow-scripts allow-same-origin'
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Category */}
+                  <div className='space-y-3'>
+                    <label className='text-xs font-extrabold text-slate-300 flex items-center gap-2'>
+                      <span className='w-5 h-5 rounded-md bg-primary/20 text-primary text-3xs font-black flex items-center justify-center'>
+                        3
+                      </span>
+                      Danh mục ngành nghề
+                    </label>
+                    <CategorySelector value={newCategory} onChange={setNewCategory} />
+                  </div>
+                </div>
+              )}
+
+              {/* ── Step 2: Tên & Mô tả ── */}
+              {wizardStep === 2 && (
+                <div className='space-y-5'>
+                  <div className='bg-slate-900/40 border border-slate-800 rounded-2xl p-4 text-xs text-slate-400 flex items-center gap-3'>
+                    <RiTranslate2 className='w-5 h-5 text-primary flex-shrink-0' />
+                    <span>
+                      Nhập tên và mô tả cho cả <strong className='text-white'>Tiếng Việt</strong> và{' '}
+                      <strong className='text-white'>Tiếng Anh</strong> để website hiển thị đúng
+                      theo ngôn ngữ.
+                    </span>
+                  </div>
+
+                  {/* Language Tabs */}
+                  <div className='flex gap-2 bg-slate-900/60 border border-slate-800 rounded-2xl p-1.5'>
+                    {(['vi', 'en'] as const).map((lang) => (
+                      <button
+                        key={lang}
+                        type='button'
+                        onClick={() => setNewLangTab(lang)}
+                        className={`flex-1 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                          newLangTab === lang
+                            ? 'bg-primary text-white shadow-md'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {lang === 'vi' ? '🇻🇳 Tiếng Việt' : '🇬🇧 English'}
+                      </button>
+                    ))}
+                  </div>
+
+                  {newLangTab === 'vi' ? (
+                    <div className='space-y-4'>
+                      <div className='space-y-2'>
+                        <label className='text-xs font-extrabold text-slate-400 block'>
+                          Tiêu đề (Tiếng Việt)
+                        </label>
+                        <input
+                          type='text'
+                          value={newTitleVi}
+                          onChange={(e) => setNewTitleVi(e.target.value)}
+                          placeholder='Ví dụ: Website Bán Hàng Thời Trang'
+                          className='w-full py-3.5 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white placeholder-slate-600 rounded-xl focus:outline-none transition-all'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <label className='text-xs font-extrabold text-slate-400 block'>
+                          Mô tả ngắn (Tiếng Việt)
+                        </label>
+                        <textarea
+                          value={newDescVi}
+                          onChange={(e) => setNewDescVi(e.target.value)}
+                          placeholder='Mô tả tính năng nổi bật của giao diện này...'
+                          rows={4}
+                          className='w-full py-3.5 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white placeholder-slate-600 rounded-xl focus:outline-none transition-all resize-none'
+                        />
+                        <p className='text-3xs text-slate-600 text-right'>
+                          {newDescVi.length}/200 ký tự
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className='space-y-4'>
+                      <div className='space-y-2'>
+                        <label className='text-xs font-extrabold text-slate-400 block'>
+                          Title (English)
+                        </label>
+                        <input
+                          type='text'
+                          value={newTitleEn}
+                          onChange={(e) => setNewTitleEn(e.target.value)}
+                          placeholder='E.g., Fashion E-Commerce Theme'
+                          className='w-full py-3.5 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white placeholder-slate-600 rounded-xl focus:outline-none transition-all'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <label className='text-xs font-extrabold text-slate-400 block'>
+                          Short Description (English)
+                        </label>
+                        <textarea
+                          value={newDescEn}
+                          onChange={(e) => setNewDescEn(e.target.value)}
+                          placeholder='Describe the key features of this template...'
+                          rows={4}
+                          className='w-full py-3.5 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white placeholder-slate-600 rounded-xl focus:outline-none transition-all resize-none'
+                        />
+                        <p className='text-3xs text-slate-600 text-right'>
+                          {newDescEn.length}/200 chars
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Step 3: Thumbnail ── */}
+              {wizardStep === 3 && (
+                <div className='space-y-5'>
+                  <div className='bg-slate-900/40 border border-slate-800 rounded-2xl p-4 text-xs text-slate-400 flex items-center gap-3'>
+                    <RiImageLine className='w-5 h-5 text-primary flex-shrink-0' />
+                    <span>
+                      Ảnh đại diện giúp người dùng nhận biết giao diện trước khi xem demo. Hỗ trợ{' '}
+                      <strong className='text-white'>kéo thả</strong> trực tiếp.
+                    </span>
+                  </div>
+                  <ThumbnailUploader
+                    thumbnailUrl={newThumbnailUrl}
+                    onUrlChange={setNewThumbnailUrl}
+                    isUploading={isUploading}
+                    uploadError={uploadError}
+                    onFileSelect={(file) => handleFileUpload(file, 'new')}
+                    inputId='create-thumbnail'
+                  />
+
+                  {/* Summary card */}
+                  <div className='bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-3'>
+                    <p className='text-xs font-extrabold text-slate-400 uppercase tracking-wider'>
+                      Tóm tắt thông tin
+                    </p>
+                    <div className='space-y-2 text-xs'>
+                      <div className='flex items-center justify-between'>
+                        <span className='text-slate-500'>Mã Key</span>
+                        <span className='text-white font-mono font-bold'>{newKey || '—'}</span>
+                      </div>
+                      <div className='flex items-center justify-between'>
+                        <span className='text-slate-500'>Danh mục</span>
+                        <span
+                          className={`font-bold px-2 py-0.5 rounded-full border text-3xs ${getCatConfig(newCategory).color}`}
+                        >
+                          {getCatConfig(newCategory).label}
+                        </span>
+                      </div>
+                      <div className='flex items-center justify-between'>
+                        <span className='text-slate-500'>Link demo</span>
+                        <a
+                          href={newDemoPath}
+                          target='_blank'
+                          rel='noopener noreferrer'
+                          className='text-primary hover:underline truncate max-w-[200px]'
+                        >
+                          {newDemoPath || '—'}
+                        </a>
+                      </div>
+                      <div className='flex items-center justify-between'>
+                        <span className='text-slate-500'>Tên (VI)</span>
+                        <span className='text-slate-300'>{newTitleVi || '—'}</span>
+                      </div>
+                      <div className='flex items-center justify-between'>
+                        <span className='text-slate-500'>Thumbnail</span>
+                        <span
+                          className={
+                            newThumbnailUrl ? 'text-emerald-400 font-bold' : 'text-slate-500'
+                          }
+                        >
+                          {newThumbnailUrl ? '✅ Đã chọn' : 'Chưa có (bỏ qua được)'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Wizard Footer */}
+            <div className='px-8 pb-7 pt-5 border-t border-slate-800/80 flex-shrink-0'>
+              <div className='flex gap-3'>
+                {wizardStep > 1 ? (
+                  <button
+                    type='button'
+                    onClick={() => setWizardStep((s) => s - 1)}
+                    disabled={isPending}
+                    className='px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-2'
+                  >
+                    <RiArrowLeftLine className='w-4 h-4' />
+                    Quay lại
+                  </button>
+                ) : (
+                  <button
+                    type='button'
+                    onClick={closeCreateModal}
+                    disabled={isPending}
+                    className='px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-extrabold rounded-xl transition-all cursor-pointer'
+                  >
+                    Hủy
+                  </button>
+                )}
+
+                {wizardStep < STEPS.length ? (
+                  <button
+                    type='button'
+                    onClick={() => setWizardStep((s) => s + 1)}
+                    disabled={wizardStep === 1 && !canGoNextStep1}
+                    className='flex-1 py-3 bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-extrabold rounded-xl shadow-lg shadow-primary/20 transition-all cursor-pointer flex items-center justify-center gap-2'
+                  >
+                    Tiếp theo
+                    <RiArrowRightLine className='w-4 h-4' />
+                  </button>
+                ) : (
+                  <button
+                    type='button'
+                    onClick={handleCreate}
+                    disabled={isPending || isUploading || !canGoNextStep1}
+                    className='flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-extrabold rounded-xl shadow-lg shadow-emerald-950/30 transition-all cursor-pointer flex items-center justify-center gap-2'
+                  >
+                    {isPending ? (
+                      <>
+                        <RiLoader4Line className='w-4 h-4 animate-spin' />
+                        Đang lưu...
+                      </>
+                    ) : (
+                      <>
+                        <RiCheckLine className='w-4 h-4' />
+                        Tạo website mẫu
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════════
+          EDIT MODAL
+      ═══════════════════════════════════════════════════════════════════════ */}
+      {editingTemplate && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95'>
+          <div className='w-full max-w-2xl bg-[#0f1728] border border-slate-800 rounded-3xl shadow-[0_30px_60px_-10px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col max-h-[92vh]'>
+            {/* Edit Header */}
+            <div className='px-8 pt-7 pb-5 border-b border-slate-800/80 flex-shrink-0 flex items-center justify-between'>
+              <div>
+                <h2 className='text-lg font-black text-white flex items-center gap-2.5'>
+                  Chỉnh sửa website
+                  <span className='bg-primary/10 border border-primary/20 text-primary font-mono text-xs font-bold px-2.5 py-1 rounded-lg'>
+                    {editingTemplate.key.toUpperCase()}
+                  </span>
+                </h2>
+                <p className='text-xs text-slate-500 mt-1'>
+                  Danh mục:{' '}
+                  <span className='text-slate-300'>
+                    {getCatConfig(editingTemplate.category).label}
+                  </span>
+                </p>
+              </div>
+              <button
+                onClick={closeEditModal}
+                className='p-2 rounded-full hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer'
+              >
+                <RiCloseLine className='w-5 h-5' />
+              </button>
+            </div>
+
+            {/* Edit Form */}
+            <div className='flex-1 overflow-y-auto px-8 py-6 space-y-6'>
+              {/* Category */}
+              <div className='space-y-3'>
+                <label className='text-xs font-extrabold text-slate-300 flex items-center gap-2'>
+                  <RiLayoutLine className='w-4 h-4 text-primary' />
+                  Danh mục
+                </label>
+                <CategorySelector value={editCategory} onChange={setEditCategory} />
+              </div>
+
+              {/* Demo Link */}
+              <div className='space-y-2'>
+                <label className='text-xs font-extrabold text-slate-300 flex items-center gap-2'>
+                  <RiLink className='w-4 h-4 text-primary' />
+                  Link website demo
+                </label>
+                <input
+                  type='url'
+                  value={editDemoPath}
+                  onChange={(e) => setEditDemoPath(e.target.value)}
+                  placeholder='https://...'
+                  disabled={isPending}
+                  className='w-full py-3.5 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white placeholder-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all'
+                />
+              </div>
+
+              {/* Language Tabs for Title/Desc */}
+              <div className='space-y-4'>
+                <label className='text-xs font-extrabold text-slate-300 flex items-center gap-2'>
+                  <RiTranslate2 className='w-4 h-4 text-primary' />
+                  Tên & Mô tả đa ngôn ngữ
+                </label>
+                <div className='flex gap-2 bg-slate-900/60 border border-slate-800 rounded-2xl p-1.5'>
+                  {(['vi', 'en'] as const).map((lang) => (
+                    <button
+                      key={lang}
+                      type='button'
+                      onClick={() => setEditLangTab(lang)}
+                      className={`flex-1 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                        editLangTab === lang
+                          ? 'bg-primary text-white shadow-md'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {lang === 'vi' ? '🇻🇳 Tiếng Việt' : '🇬🇧 English'}
+                    </button>
+                  ))}
+                </div>
+
+                {editLangTab === 'vi' ? (
+                  <div className='space-y-4'>
+                    <input
+                      type='text'
+                      value={editTitleVi}
+                      onChange={(e) => setEditTitleVi(e.target.value)}
+                      placeholder='Tiêu đề tiếng Việt...'
+                      disabled={isPending}
+                      className='w-full py-3.5 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white placeholder-slate-600 rounded-xl focus:outline-none transition-all'
+                    />
+                    <textarea
+                      value={editDescVi}
+                      onChange={(e) => setEditDescVi(e.target.value)}
+                      placeholder='Mô tả ngắn tiếng Việt...'
+                      disabled={isPending}
+                      rows={3}
+                      className='w-full py-3.5 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white placeholder-slate-600 rounded-xl focus:outline-none transition-all resize-none'
+                    />
+                  </div>
+                ) : (
+                  <div className='space-y-4'>
+                    <input
+                      type='text'
+                      value={editTitleEn}
+                      onChange={(e) => setEditTitleEn(e.target.value)}
+                      placeholder='English title...'
+                      disabled={isPending}
+                      className='w-full py-3.5 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white placeholder-slate-600 rounded-xl focus:outline-none transition-all'
+                    />
+                    <textarea
+                      value={editDescEn}
+                      onChange={(e) => setEditDescEn(e.target.value)}
+                      placeholder='Short description in English...'
+                      disabled={isPending}
+                      rows={3}
+                      className='w-full py-3.5 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white placeholder-slate-600 rounded-xl focus:outline-none transition-all resize-none'
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Thumbnail */}
+              <div className='space-y-2'>
+                <label className='text-xs font-extrabold text-slate-300 flex items-center gap-2'>
+                  <RiImageLine className='w-4 h-4 text-primary' />
+                  Ảnh đại diện (Thumbnail)
+                </label>
+                <ThumbnailUploader
+                  thumbnailUrl={editThumbnailUrl}
+                  onUrlChange={setEditThumbnailUrl}
+                  isUploading={isUploading}
+                  uploadError={uploadError}
+                  onFileSelect={(file) => handleFileUpload(file, 'edit')}
+                  inputId='edit-thumbnail'
+                />
+              </div>
+            </div>
+
+            {/* Edit Footer */}
+            <div className='px-8 pb-7 pt-5 border-t border-slate-800/80 flex-shrink-0'>
+              <div className='flex gap-3'>
+                <button
+                  type='button'
+                  onClick={closeEditModal}
+                  disabled={isPending}
+                  className='px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-extrabold rounded-xl transition-all cursor-pointer'
+                >
+                  Hủy
+                </button>
+                <button
+                  type='button'
+                  onClick={handleSave}
+                  disabled={isPending || isUploading}
+                  className='flex-1 py-3 bg-primary hover:bg-primary/90 disabled:opacity-45 disabled:cursor-not-allowed text-white text-xs font-extrabold rounded-xl shadow-lg shadow-primary/20 transition-all cursor-pointer flex items-center justify-center gap-2'
+                >
+                  {isPending ? (
+                    <>
+                      <RiLoader4Line className='w-4 h-4 animate-spin' />
+                      Đang lưu...
+                    </>
+                  ) : (
+                    <>
+                      <RiCheckLine className='w-4 h-4' />
+                      Lưu thay đổi
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════════
+          EDIT PRICING PLAN MODAL
+      ═══════════════════════════════════════════════════════════════════════ */}
+      {editingPlan && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95'>
+          <div className='w-full max-w-2xl bg-[#0f1728] border border-slate-800 rounded-3xl shadow-[0_30px_60px_-10px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col max-h-[92vh]'>
+            <div className='px-8 pt-7 pb-5 border-b border-slate-800/80 flex-shrink-0 flex items-center justify-between'>
+              <div>
+                <h2 className='text-lg font-black text-white flex items-center gap-2.5'>
+                  Chỉnh sửa gói dịch vụ
+                  <span className='bg-primary/10 border border-primary/20 text-primary font-mono text-xs font-bold px-2.5 py-1 rounded-lg'>
+                    {editingPlan.key.toUpperCase()}
+                  </span>
+                </h2>
+              </div>
+              <button
+                onClick={closeEditPlanModal}
+                className='p-2 rounded-full hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer'
+              >
+                <RiCloseLine className='w-5 h-5' />
+              </button>
+            </div>
+
+            <div className='flex-1 overflow-y-auto px-8 py-6 space-y-6'>
+              {/* Language Tabs for Plan Details */}
+              <div className='space-y-4'>
+                <div className='flex gap-2 bg-slate-900/60 border border-slate-800 rounded-2xl p-1.5'>
+                  {(['vi', 'en'] as const).map((lang) => (
+                    <button
+                      key={lang}
+                      type='button'
+                      onClick={() => setEditPlanLangTab(lang)}
+                      className={`flex-1 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                        editPlanLangTab === lang
+                          ? 'bg-primary text-white shadow-md'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {lang === 'vi' ? '🇻🇳 Tiếng Việt' : '🇬🇧 English'}
+                    </button>
+                  ))}
+                </div>
+
+                {editPlanLangTab === 'vi' ? (
+                  <div className='space-y-4'>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Tên gói (Tiếng Việt) *
+                      </label>
+                      <input
+                        type='text'
+                        value={editPlanNameVi}
+                        onChange={(e) => setEditPlanNameVi(e.target.value)}
+                        placeholder='Ví dụ: Bứt Phá (Growth)'
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                      />
+                    </div>
+                    <div className='grid grid-cols-2 gap-4'>
+                      <div className='space-y-2'>
+                        <label className='text-xs font-extrabold text-slate-400 block'>
+                          Giá cả (Tiếng Việt) *
+                        </label>
+                        <input
+                          type='text'
+                          value={editPlanPriceVi}
+                          onChange={(e) => setEditPlanPriceVi(e.target.value)}
+                          placeholder='Ví dụ: 12.9tr, Liên hệ...'
+                          className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <label className='text-xs font-extrabold text-slate-400 block'>
+                          Chu kỳ (Tiếng Việt)
+                        </label>
+                        <input
+                          type='text'
+                          value={editPlanPeriodVi}
+                          onChange={(e) => setEditPlanPeriodVi(e.target.value)}
+                          placeholder='Ví dụ: trọn gói, tháng, năm...'
+                          className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                        />
+                      </div>
+                    </div>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Mô tả (Tiếng Việt)
+                      </label>
+                      <textarea
+                        value={editPlanDescVi}
+                        onChange={(e) => setEditPlanDescVi(e.target.value)}
+                        placeholder='Mô tả ngắn về gói...'
+                        rows={2}
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all resize-none'
+                      />
+                    </div>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Danh sách tính năng (Tiếng Việt) - Mỗi dòng một tính năng
+                      </label>
+                      <textarea
+                        value={editPlanFeaturesVi}
+                        onChange={(e) => setEditPlanFeaturesVi(e.target.value)}
+                        placeholder='Website độc quyền&#10;Tặng bài viết SEO&#10;Hỗ trợ 12 tháng...'
+                        rows={6}
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white font-mono rounded-xl focus:outline-none transition-all resize-y'
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className='space-y-4'>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Plan Name (English) *
+                      </label>
+                      <input
+                        type='text'
+                        value={editPlanNameEn}
+                        onChange={(e) => setEditPlanNameEn(e.target.value)}
+                        placeholder='E.g., Growth Plan'
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                      />
+                    </div>
+                    <div className='grid grid-cols-2 gap-4'>
+                      <div className='space-y-2'>
+                        <label className='text-xs font-extrabold text-slate-400 block'>
+                          Price (English) *
+                        </label>
+                        <input
+                          type='text'
+                          value={editPlanPriceEn}
+                          onChange={(e) => setEditPlanPriceEn(e.target.value)}
+                          placeholder='E.g., $550, Custom...'
+                          className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <label className='text-xs font-extrabold text-slate-400 block'>
+                          Period (English)
+                        </label>
+                        <input
+                          type='text'
+                          value={editPlanPeriodEn}
+                          onChange={(e) => setEditPlanPeriodEn(e.target.value)}
+                          placeholder='E.g., one-time, month, year...'
+                          className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                        />
+                      </div>
+                    </div>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Description (English)
+                      </label>
+                      <textarea
+                        value={editPlanDescEn}
+                        onChange={(e) => setEditPlanDescEn(e.target.value)}
+                        placeholder='Short description of the plan...'
+                        rows={2}
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all resize-none'
+                      />
+                    </div>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Features List (English) - One feature per line
+                      </label>
+                      <textarea
+                        value={editPlanFeaturesEn}
+                        onChange={(e) => setEditPlanFeaturesEn(e.target.value)}
+                        placeholder='Premium custom design&#10;Free SEO articles&#10;12 months support...'
+                        rows={6}
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white font-mono rounded-xl focus:outline-none transition-all resize-y'
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className='h-px bg-slate-800' />
+
+              {/* Status and settings */}
+              <div className='grid grid-cols-1 sm:grid-cols-3 gap-6'>
+                <div className='space-y-2'>
+                  <label className='text-xs font-extrabold text-slate-300 block'>
+                    Nổi bật (Best Seller)
+                  </label>
+                  <label className='relative inline-flex items-center cursor-pointer pt-1'>
+                    <input
+                      type='checkbox'
+                      checked={editPlanIsPopular}
+                      onChange={(e) => setEditPlanIsPopular(e.target.checked)}
+                      className='sr-only peer'
+                    />
+                    <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[6px] after:left-[2px] after:bg-slate-300 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    <span className='ml-3 text-xs text-slate-400 font-bold'>
+                      {editPlanIsPopular ? 'Bán chạy nhất' : 'Không'}
+                    </span>
+                  </label>
+                </div>
+
+                <div className='space-y-2'>
+                  <label className='text-xs font-extrabold text-slate-300 block'>
+                    Kiểu nút chọn
+                  </label>
+                  <select
+                    value={editPlanButtonVariant}
+                    onChange={(e) =>
+                      setEditPlanButtonVariant(e.target.value as 'outline' | 'default')
+                    }
+                    className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 text-xs text-white rounded-xl focus:outline-none focus:border-primary/60'
+                  >
+                    <option value='outline'>Viền (Outline)</option>
+                    <option value='default'>Đầy (Default)</option>
+                  </select>
+                </div>
+
+                <div className='space-y-2'>
+                  <label className='text-xs font-extrabold text-slate-300 block'>
+                    Thứ tự sắp xếp
+                  </label>
+                  <input
+                    type='number'
+                    value={editPlanSortOrder}
+                    onChange={(e) => setEditPlanSortOrder(Number(e.target.value))}
+                    className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-xs text-white rounded-xl focus:outline-none transition-all'
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className='px-8 pb-7 pt-5 border-t border-slate-800/80 flex-shrink-0'>
+              <div className='flex gap-3'>
+                <button
+                  type='button'
+                  onClick={closeEditPlanModal}
+                  disabled={isSavingPlan}
+                  className='px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-extrabold rounded-xl transition-all cursor-pointer'
+                >
+                  Hủy
+                </button>
+                <button
+                  type='button'
+                  onClick={handleSavePlan}
+                  disabled={isSavingPlan}
+                  className='flex-1 py-3 bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-extrabold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 cursor-pointer'
+                >
+                  {isSavingPlan ? (
+                    <>
+                      <RiLoader4Line className='w-4 h-4 animate-spin' />
+                      Đang lưu...
+                    </>
+                  ) : (
+                    <>
+                      <RiCheckLine className='w-4 h-4' />
+                      Lưu thay đổi
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════════
+          CREATE PRICING PLAN MODAL
+      ═══════════════════════════════════════════════════════════════════════ */}
+      {isCreatePlanOpen && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95'>
+          <div className='w-full max-w-2xl bg-[#0f1728] border border-slate-800 rounded-3xl shadow-[0_30px_60px_-10px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col max-h-[92vh]'>
+            <div className='px-8 pt-7 pb-5 border-b border-slate-800/80 flex-shrink-0 flex items-center justify-between'>
+              <div>
+                <h2 className='text-lg font-black text-white'>Thêm gói dịch vụ mới</h2>
+              </div>
+              <button
+                onClick={closeCreatePlanModal}
+                className='p-2 rounded-full hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer'
+              >
+                <RiCloseLine className='w-5 h-5' />
+              </button>
+            </div>
+
+            <div className='flex-1 overflow-y-auto px-8 py-6 space-y-6'>
+              {/* Key */}
+              <div className='space-y-2'>
+                <label className='text-xs font-extrabold text-slate-300 block'>
+                  Mã định danh (Key) *
+                </label>
+                <input
+                  type='text'
+                  value={newPlanKey}
+                  onChange={(e) => setNewPlanKey(e.target.value)}
+                  placeholder='Ví dụ: starter, growth, enterprise, premium'
+                  className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all font-mono'
+                />
+                <p className='text-3xs text-slate-500'>
+                  Mã duy nhất viết thường, không dấu, không khoảng cách. Ví dụ: custom-plan
+                </p>
+              </div>
+
+              {/* Language Tabs for Plan Details */}
+              <div className='space-y-4'>
+                <div className='flex gap-2 bg-slate-900/60 border border-slate-800 rounded-2xl p-1.5'>
+                  {(['vi', 'en'] as const).map((lang) => (
+                    <button
+                      key={lang}
+                      type='button'
+                      onClick={() => setNewPlanLangTab(lang)}
+                      className={`flex-1 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                        newPlanLangTab === lang
+                          ? 'bg-primary text-white shadow-md'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {lang === 'vi' ? '🇻🇳 Tiếng Việt' : '🇬🇧 English'}
+                    </button>
+                  ))}
+                </div>
+
+                {newPlanLangTab === 'vi' ? (
+                  <div className='space-y-4'>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Tên gói (Tiếng Việt) *
+                      </label>
+                      <input
+                        type='text'
+                        value={newPlanNameVi}
+                        onChange={(e) => setNewPlanNameVi(e.target.value)}
+                        placeholder='Ví dụ: Bứt Phá (Growth)'
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                      />
+                    </div>
+                    <div className='grid grid-cols-2 gap-4'>
+                      <div className='space-y-2'>
+                        <label className='text-xs font-extrabold text-slate-400 block'>
+                          Giá cả (Tiếng Việt) *
+                        </label>
+                        <input
+                          type='text'
+                          value={newPlanPriceVi}
+                          onChange={(e) => setNewPlanPriceVi(e.target.value)}
+                          placeholder='Ví dụ: 12.9tr, Liên hệ...'
+                          className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <label className='text-xs font-extrabold text-slate-400 block'>
+                          Chu kỳ (Tiếng Việt)
+                        </label>
+                        <input
+                          type='text'
+                          value={newPlanPeriodVi}
+                          onChange={(e) => setNewPlanPeriodVi(e.target.value)}
+                          placeholder='Ví dụ: trọn gói, tháng, năm...'
+                          className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                        />
+                      </div>
+                    </div>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Mô tả (Tiếng Việt)
+                      </label>
+                      <textarea
+                        value={newPlanDescVi}
+                        onChange={(e) => setNewPlanDescVi(e.target.value)}
+                        placeholder='Mô tả ngắn về gói...'
+                        rows={2}
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all resize-none'
+                      />
+                    </div>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Danh sách tính năng (Tiếng Việt) - Mỗi dòng một tính năng
+                      </label>
+                      <textarea
+                        value={newPlanFeaturesVi}
+                        onChange={(e) => setNewPlanFeaturesVi(e.target.value)}
+                        placeholder='Website độc quyền&#10;Tặng bài viết SEO&#10;Hỗ trợ 12 tháng...'
+                        rows={6}
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white font-mono rounded-xl focus:outline-none transition-all resize-y'
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className='space-y-4'>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Plan Name (English) *
+                      </label>
+                      <input
+                        type='text'
+                        value={newPlanNameEn}
+                        onChange={(e) => setNewPlanNameEn(e.target.value)}
+                        placeholder='E.g., Growth Plan'
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                      />
+                    </div>
+                    <div className='grid grid-cols-2 gap-4'>
+                      <div className='space-y-2'>
+                        <label className='text-xs font-extrabold text-slate-400 block'>
+                          Price (English) *
+                        </label>
+                        <input
+                          type='text'
+                          value={newPlanPriceEn}
+                          onChange={(e) => setNewPlanPriceEn(e.target.value)}
+                          placeholder='E.g., $550, Custom...'
+                          className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <label className='text-xs font-extrabold text-slate-400 block'>
+                          Period (English)
+                        </label>
+                        <input
+                          type='text'
+                          value={newPlanPeriodEn}
+                          onChange={(e) => setNewPlanPeriodEn(e.target.value)}
+                          placeholder='E.g., one-time, month, year...'
+                          className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                        />
+                      </div>
+                    </div>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Description (English)
+                      </label>
+                      <textarea
+                        value={newPlanDescEn}
+                        onChange={(e) => setNewPlanDescEn(e.target.value)}
+                        placeholder='Short description of the plan...'
+                        rows={2}
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all resize-none'
+                      />
+                    </div>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Features List (English) - One feature per line
+                      </label>
+                      <textarea
+                        value={newPlanFeaturesEn}
+                        onChange={(e) => setNewPlanFeaturesEn(e.target.value)}
+                        placeholder='Premium custom design&#10;Free SEO articles&#10;12 months support...'
+                        rows={6}
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white font-mono rounded-xl focus:outline-none transition-all resize-y'
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className='h-px bg-slate-800' />
+
+              {/* Status and settings */}
+              <div className='grid grid-cols-1 sm:grid-cols-3 gap-6'>
+                <div className='space-y-2'>
+                  <label className='text-xs font-extrabold text-slate-300 block'>
+                    Nổi bật (Best Seller)
+                  </label>
+                  <label className='relative inline-flex items-center cursor-pointer pt-1'>
+                    <input
+                      type='checkbox'
+                      checked={newPlanIsPopular}
+                      onChange={(e) => setNewPlanIsPopular(e.target.checked)}
+                      className='sr-only peer'
+                    />
+                    <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[6px] after:left-[2px] after:bg-slate-300 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    <span className='ml-3 text-xs text-slate-400 font-bold'>
+                      {newPlanIsPopular ? 'Bán chạy nhất' : 'Không'}
+                    </span>
+                  </label>
+                </div>
+
+                <div className='space-y-2'>
+                  <label className='text-xs font-extrabold text-slate-300 block'>
+                    Kiểu nút chọn
+                  </label>
+                  <select
+                    value={newPlanButtonVariant}
+                    onChange={(e) =>
+                      setNewPlanButtonVariant(e.target.value as 'outline' | 'default')
+                    }
+                    className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 text-xs text-white rounded-xl focus:outline-none focus:border-primary/60'
+                  >
+                    <option value='outline'>Viền (Outline)</option>
+                    <option value='default'>Đầy (Default)</option>
+                  </select>
+                </div>
+
+                <div className='space-y-2'>
+                  <label className='text-xs font-extrabold text-slate-300 block'>
+                    Thứ tự sắp xếp
+                  </label>
+                  <input
+                    type='number'
+                    value={newPlanSortOrder}
+                    onChange={(e) => setNewPlanSortOrder(Number(e.target.value))}
+                    className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-xs text-white rounded-xl focus:outline-none transition-all'
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className='px-8 pb-7 pt-5 border-t border-slate-800/80 flex-shrink-0'>
+              <div className='flex gap-3'>
+                <button
+                  type='button'
+                  onClick={closeCreatePlanModal}
+                  disabled={isSavingPlan}
+                  className='px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-extrabold rounded-xl transition-all cursor-pointer'
+                >
+                  Hủy
+                </button>
+                <button
+                  type='button'
+                  onClick={handleCreatePlan}
+                  disabled={isSavingPlan}
+                  className='flex-1 py-3 bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-extrabold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 cursor-pointer'
+                >
+                  {isSavingPlan ? (
+                    <>
+                      <RiLoader4Line className='w-4 h-4 animate-spin' />
+                      Đang tạo...
+                    </>
+                  ) : (
+                    <>
+                      <RiCheckLine className='w-4 h-4' />
+                      Tạo gói dịch vụ
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

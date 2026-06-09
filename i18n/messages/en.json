@@ -5,9 +5,221 @@
       "vi": "Vietnamese",
       "en": "English"
     },
-    "theme": "Appearance"
+    "theme": "Appearance",
+    "contactBtn": "Contact Us",
+    "backToTop": "Back to top"
   },
   "auth": {
     "login": "Login"
+  },
+  "hero": {
+    "badge": "All-in-One Digital Solutions",
+    "title": "Stunning Web Design & High-Converting Digital Marketing",
+    "subtitle": "Katalin Solutions partners with you to build a highly optimized digital ecosystem: from SEO-ready websites, premium content to conversion-optimized ad campaigns.",
+    "cta": "Free Consultation",
+    "secondary": "Explore Services"
+  },
+  "services": {
+    "title": "Our Services",
+    "subtitle": "Comprehensive solutions to help your business thrive and scale in the digital landscape.",
+    "web": {
+      "title": "Web Design & Development",
+      "desc": "Exclusive, modern websites optimized for SEO and fully responsive across all mobile viewports.",
+      "subcategories": {
+        "sales": {
+          "title": "E-Commerce Website",
+          "desc": "Optimized shopping cart, checkout, and inventory management for online shops and retail businesses."
+        },
+        "services": {
+          "title": "Service Directory Website",
+          "desc": "Integrated booking system and service catalogs for spas, clinics, consultancies, and travel agencies."
+        },
+        "intro": {
+          "title": "Corporate Website",
+          "desc": "Showcasing company profile, portfolio, values, and boosting brand credibility online."
+        },
+        "landing": {
+          "title": "Landing Page",
+          "desc": "High-converting single pages tailored for lead generation and target ad campaigns."
+        },
+        "custom": {
+          "title": "Custom Web Development",
+          "desc": "Bespoke custom features, software integrations, and exclusive corporate portals."
+        }
+      }
+    },
+    "content": {
+      "title": "Content Marketing & SEO",
+      "desc": "Building high-quality content strategies to engage customers and rank organically on Google Search."
+    },
+    "brand": {
+      "title": "Brand Identity & Strategy",
+      "desc": "Professional visual branding, logo design, and guidelines to secure customer trust and authority."
+    },
+    "ads": {
+      "title": "Conversion Ads Optimization",
+      "desc": "Targeted ad campaigns (Google, Facebook, TikTok) focused on maximizing conversion rate and return on ad spend."
+    }
+  },
+  "about": {
+    "title": "About Katalin Solutions",
+    "subtitle": "Your digital growth partner",
+    "desc1": "We don't just build websites or run ads; we build integrated digital solutions to streamline operations and unlock massive revenue growth.",
+    "desc2": "With a seasoned team of tech and marketing experts, Katalin guarantees top-tier products, bespoke designs, and unparalleled customer care.",
+    "stats": {
+      "projects": "Completed Projects",
+      "clients": "Happy Clients",
+      "conversion": "Conversion Growth",
+      "support": "24/7 Support"
+    }
+  },
+  "portfolio": {
+    "title": "Featured Work",
+    "subtitle": "Creative products built and successfully operated by our team.",
+    "categories": {
+      "all": "All",
+      "web": "Web Design",
+      "marketing": "Digital Marketing",
+      "brand": "Branding"
+    },
+    "items": {
+      "proj1": {
+        "title": "E-Commerce Fashion Hub",
+        "desc": "Custom clothing store with automated payment processing and seamless mobile shopping experience."
+      },
+      "proj2": {
+        "title": "Luxury Land Real Estate",
+        "desc": "Premium high-end property portal featuring interactive map searches and lead gen."
+      },
+      "proj3": {
+        "title": "F&B Brand Ads Campaign",
+        "desc": "Food delivery advertising campaign resulting in +180% online sales in under 3 months."
+      }
+    }
+  },
+  "pricing": {
+    "title": "Pricing & Plans",
+    "subtitle": "Flexible plans tailored for every stage of your business growth.",
+    "starter": {
+      "name": "Starter Plan",
+      "desc": "Ideal for startups, local stores, or personal brands looking to build a digital presence.",
+      "price": "$250",
+      "period": "one-time",
+      "features": [
+        "SEO-friendly basic website",
+        "Fully responsive layout",
+        "Free SSL setup",
+        "3 months technical support"
+      ]
+    },
+    "growth": {
+      "name": "Growth Plan",
+      "desc": "Perfect for businesses aiming to actively boost online sales and conversion.",
+      "price": "$550",
+      "period": "one-time",
+      "features": [
+        "Bespoke high-end web design",
+        "Payment integration & Chatbot setup",
+        "3 deep-dive SEO articles included",
+        "12 months support & maintenance"
+      ]
+    },
+    "enterprise": {
+      "name": "Enterprise Plan",
+      "desc": "Customized end-to-end solutions for larger organizations or custom platforms.",
+      "price": "Custom",
+      "period": "tailored",
+      "features": [
+        "Custom web app / database systems",
+        "Internal ERP/CRM integration",
+        "Omnichannel marketing strategy",
+        "Dedicated engineer 24/7"
+      ]
+    }
+  },
+  "testimonials": {
+    "title": "What Our Clients Say",
+    "subtitle": "Your trust is the fuel behind the growth of Katalin Solutions.",
+    "list": {
+      "user1": {
+        "name": "Minh Anh Nguyen",
+        "role": "CEO Luxury Design",
+        "comment": "The website is extremely fast and smooth. Katalin's team is professional and supported us even during weekends."
+      },
+      "user2": {
+        "name": "Thanh Son Tran",
+        "role": "Founder Cafe & Bakery Chain",
+        "comment": "The ad campaign managed by Katalin brings steady leads daily. Our revenue grew beyond expectations!"
+      }
+    }
+  },
+  "contact": {
+    "title": "Get in Touch",
+    "subtitle": "Fill in the form, and our digital consultant will call you back within 15 minutes to discuss your solution.",
+    "placeholderName": "Your Name",
+    "placeholderEmail": "Email Address",
+    "placeholderPhone": "Phone Number",
+    "placeholderMsg": "Your requirement (Web design, ad campaigns, branding...)",
+    "sendBtn": "Submit Request",
+    "success": "Sent successfully! We will contact you shortly.",
+    "error": "An error occurred. Please try again later.",
+    "required": "This field is required"
+  },
+  "templates": {
+    "title": "Professional Website Templates",
+    "subtitle": "Explore our modern, SEO-friendly templates optimized for all devices and conversions.",
+    "sidebar": {
+      "title": "Browse by Industry",
+      "all": "All Templates",
+      "sales": "E-Commerce",
+      "services": "Services",
+      "intro": "Corporate",
+      "landing": "Landing Pages",
+      "uncategorized": "Uncategorized",
+      "needHelp": "NEED TO DECIDE FAST?",
+      "needHelpDesc": "Send us your industry and preferred style.",
+      "needHelpBtn": "Get Consulted Now"
+    },
+    "search": {
+      "placeholder": "Search by template name...",
+      "button": "Search",
+      "showing": "Showing {current} of {total} results",
+      "noResults": "No matching templates found."
+    },
+    "sort": {
+      "default": "Default Sorting",
+      "newest": "Newest",
+      "popular": "Most Popular"
+    },
+    "card": {
+      "detail": "Details",
+      "demo": "Live Demo"
+    },
+    "items": {
+      "theme1": {
+        "title": "Radios Tech E-Commerce Theme",
+        "desc": "Modern tech and electronics store with optimized shopping cart and sidebar filters."
+      },
+      "theme2": {
+        "title": "Avesa Beauty E-Commerce Theme",
+        "desc": "Luxurious cosmetics, skincare, spa, and beauty boutique store template."
+      },
+      "theme3": {
+        "title": "Vano Organic Agriculture Theme",
+        "desc": "Fresh farm produce, clean food, and organic items online store template."
+      },
+      "theme4": {
+        "title": "GoFoodie Restaurant Booking Theme",
+        "desc": "F&B showcase, online table booking, and restaurant menu template."
+      },
+      "theme5": {
+        "title": "Terranova Real Estate Theme",
+        "desc": "Premium template for real estate agencies, luxury apartments, and villas."
+      },
+      "theme6": {
+        "title": "Organic Fresh Landing Page",
+        "desc": "Highly converting single page for organic products, optimized for ads conversion."
+      }
+    }
   }
 }
