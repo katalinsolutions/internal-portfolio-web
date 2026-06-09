@@ -15,6 +15,7 @@ import {
   createContactLead,
   getContactLeads,
   deleteContactLead,
+  updateContactLeadStatus,
   ContactLead,
 } from '@/lib/db';
 
@@ -290,5 +291,29 @@ export async function deleteContactLeadAction(
   } catch (err) {
     console.error('deleteContactLeadAction error:', err);
     return { success: false, error: 'Lỗi hệ thống khi xóa yêu cầu' };
+  }
+}
+
+/**
+ * Authenticated action to update a contact lead status.
+ */
+export async function updateContactLeadStatusAction(
+  id: string | number,
+  status: 'pending' | 'completed',
+): Promise<{ success: boolean; error?: string }> {
+  const isAuth = await isAuthenticated();
+  if (!isAuth) {
+    return { success: false, error: 'Chưa đăng nhập hoặc phiên làm việc hết hạn' };
+  }
+  try {
+    const success = await updateContactLeadStatus(id, status);
+    if (success) {
+      revalidatePath('/admin/dashboard', 'page');
+      return { success: true };
+    }
+    return { success: false, error: 'Cập nhật trạng thái thất bại' };
+  } catch (err) {
+    console.error('updateContactLeadStatusAction error:', err);
+    return { success: false, error: 'Lỗi hệ thống khi cập nhật trạng thái' };
   }
 }

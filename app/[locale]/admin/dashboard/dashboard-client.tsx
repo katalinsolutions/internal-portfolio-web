@@ -28,6 +28,8 @@ import {
   RiLayoutLine,
   RiSettings4Line,
   RiPhoneLine,
+  RiPhoneFill,
+  RiTimeLine,
   RiMessengerLine,
 } from '@remixicon/react';
 import {
@@ -38,6 +40,7 @@ import {
   deleteTemplateAction,
   saveContactSettingsAction,
   deleteContactLeadAction,
+  updateContactLeadStatusAction,
 } from '../actions';
 import { TemplateData, ContactSettings, ContactLead } from '@/lib/db';
 import WebsiteLivePreview from '@/components/shared/website-live-preview';
@@ -314,6 +317,10 @@ export default function DashboardClient({
   // ── Leads state ──
   const [leads, setLeads] = useState<ContactLead[]>(initialLeads);
   const [isDeletingLead, setIsDeletingLead] = useState<string | number | null>(null);
+  const [isTogglingLead, setIsTogglingLead] = useState<string | number | null>(null);
+  const [activeStatusFilter, setActiveStatusFilter] = useState<'all' | 'pending' | 'completed'>(
+    'all',
+  );
 
   const handleDeleteLead = async (id: string | number) => {
     if (!window.confirm('Bạn có chắc chắn muốn xóa yêu cầu tư vấn này?')) return;
@@ -333,6 +340,36 @@ export default function DashboardClient({
       setIsDeletingLead(null);
     }
   };
+
+  const handleToggleLeadStatus = async (
+    id: string | number,
+    currentStatus?: 'pending' | 'completed',
+  ) => {
+    const nextStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+    setIsTogglingLead(id);
+    try {
+      const res = await updateContactLeadStatusAction(id, nextStatus);
+      if (res.success) {
+        setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status: nextStatus } : l)));
+        router.refresh();
+      } else {
+        alert(res.error || 'Cập nhật trạng thái thất bại');
+      }
+    } catch (err) {
+      console.error('Toggle lead status error:', err);
+      alert('Lỗi hệ thống khi cập nhật trạng thái');
+    } finally {
+      setIsTogglingLead(null);
+    }
+  };
+
+  const filteredLeads = useMemo(() => {
+    return leads.filter((l) => {
+      if (activeStatusFilter === 'all') return true;
+      const status = l.status || 'pending';
+      return status === activeStatusFilter;
+    });
+  }, [leads, activeStatusFilter]);
 
   const handleSaveContact = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -570,9 +607,9 @@ export default function DashboardClient({
             </div>
             <div>
               <h1 className='text-lg font-bold text-white leading-tight'>Katalin Admin</h1>
-              <p className='text-3xs text-slate-400 uppercase tracking-widest font-extrabold'>
+              {/* <p className='text-3xs text-slate-400 uppercase tracking-widest font-extrabold'>
                 Mẫu Website & Portfolio
-              </p>
+              </p> */}
             </div>
           </div>
           <button
@@ -934,13 +971,37 @@ export default function DashboardClient({
               </span>
             </div>
 
-            {leads.length === 0 ? (
+            {/* Filter Tabs */}
+            <div className='flex flex-wrap gap-2 pb-2'>
+              {(['all', 'pending', 'completed'] as const).map((status) => (
+                <button
+                  key={status}
+                  type='button'
+                  onClick={() => setActiveStatusFilter(status)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                    activeStatusFilter === status
+                      ? 'bg-primary border-primary text-white shadow-md'
+                      : 'bg-slate-950/30 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                  }`}
+                >
+                  {status === 'all' && `Tất cả (${leads.length})`}
+                  {status === 'pending' &&
+                    `Chưa tư vấn (${leads.filter((l) => (l.status || 'pending') === 'pending').length})`}
+                  {status === 'completed' &&
+                    `Đã tư vấn (${leads.filter((l) => l.status === 'completed').length})`}
+                </button>
+              ))}
+            </div>
+
+            {filteredLeads.length === 0 ? (
               <div className='py-20 text-center text-slate-500 space-y-3 border border-dashed border-slate-800 rounded-2xl bg-slate-900/10'>
                 <RiPhoneLine className='w-12 h-12 mx-auto text-slate-700 animate-pulse' />
                 <div>
-                  <p className='text-sm font-semibold text-slate-400'>Chưa có yêu cầu tư vấn nào</p>
+                  <p className='text-sm font-semibold text-slate-400'>
+                    Không tìm thấy yêu cầu tư vấn nào
+                  </p>
                   <p className='text-xs text-slate-600 mt-1'>
-                    Khi khách hàng gửi thông tin liên hệ, yêu cầu sẽ xuất hiện tại đây.
+                    Không có yêu cầu phù hợp với bộ lọc hiện tại.
                   </p>
                 </div>
               </div>
@@ -953,13 +1014,14 @@ export default function DashboardClient({
                         <tr>
                           <th className='px-6 py-4'>Khách hàng</th>
                           <th className='px-6 py-4'>Liên hệ</th>
+                          <th className='px-6 py-4'>Trạng thái</th>
                           <th className='px-6 py-4'>Nội dung tin nhắn</th>
                           <th className='px-6 py-4'>Thời gian</th>
                           <th className='px-6 py-4 text-center'>Thao tác</th>
                         </tr>
                       </thead>
                       <tbody className='divide-y divide-slate-800/40 text-slate-300'>
-                        {leads.map((lead) => (
+                        {filteredLeads.map((lead) => (
                           <tr
                             key={lead.id}
                             className='hover:bg-slate-900/30 transition-colors duration-150'
@@ -968,8 +1030,30 @@ export default function DashboardClient({
                               {lead.name}
                             </td>
                             <td className='px-6 py-4.5 whitespace-nowrap space-y-1'>
-                              <div className='font-semibold'>{lead.phone}</div>
+                              <div className='flex items-center gap-2'>
+                                <span className='font-bold text-white'>{lead.phone}</span>
+                                <a
+                                  href={`tel:${lead.phone}`}
+                                  className='p-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg border border-emerald-500/20 transition-all flex items-center justify-center'
+                                  title='Gọi điện trực tiếp'
+                                >
+                                  <RiPhoneFill className='w-3.5 h-3.5' />
+                                </a>
+                              </div>
                               <div className='text-3xs text-slate-500 font-mono'>{lead.email}</div>
+                            </td>
+                            <td className='px-6 py-4.5 whitespace-nowrap'>
+                              {lead.status === 'completed' ? (
+                                <span className='inline-flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-3xs font-extrabold px-2.5 py-1 rounded-full'>
+                                  <RiCheckLine className='w-3.5 h-3.5' />
+                                  Đã tư vấn
+                                </span>
+                              ) : (
+                                <span className='inline-flex items-center gap-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-3xs font-extrabold px-2.5 py-1 rounded-full'>
+                                  <RiTimeLine className='w-3.5 h-3.5' />
+                                  Chưa tư vấn
+                                </span>
+                              )}
                             </td>
                             <td className='px-6 py-4.5 max-w-sm'>
                               <p
@@ -991,11 +1075,35 @@ export default function DashboardClient({
                                   })
                                 : '—'}
                             </td>
-                            <td className='px-6 py-4.5 whitespace-nowrap text-center'>
+                            <td className='px-6 py-4.5 whitespace-nowrap text-center space-x-1.5'>
+                              <button
+                                onClick={() =>
+                                  lead.id && handleToggleLeadStatus(lead.id, lead.status)
+                                }
+                                disabled={isTogglingLead === lead.id || isDeletingLead === lead.id}
+                                className={`p-2 rounded-lg border transition-all cursor-pointer inline-flex items-center justify-center ${
+                                  lead.status === 'completed'
+                                    ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/20'
+                                    : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/20'
+                                }`}
+                                title={
+                                  lead.status === 'completed'
+                                    ? 'Đánh dấu chưa tư vấn'
+                                    : 'Đánh dấu đã tư vấn'
+                                }
+                              >
+                                {isTogglingLead === lead.id ? (
+                                  <RiLoader4Line className='w-4 h-4 animate-spin' />
+                                ) : lead.status === 'completed' ? (
+                                  <RiCloseLine className='w-4 h-4' />
+                                ) : (
+                                  <RiCheckLine className='w-4 h-4' />
+                                )}
+                              </button>
                               <button
                                 onClick={() => lead.id && handleDeleteLead(lead.id)}
-                                disabled={isDeletingLead === lead.id}
-                                className='p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg border border-red-500/20 transition-all cursor-pointer inline-flex items-center justify-center'
+                                disabled={isDeletingLead === lead.id || isTogglingLead === lead.id}
+                                className='p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-lg border border-red-500/20 transition-all cursor-pointer inline-flex items-center justify-center'
                                 title='Xóa yêu cầu'
                               >
                                 {isDeletingLead === lead.id ? (

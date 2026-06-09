@@ -74,7 +74,7 @@ async function deleteSupabaseFile(publicUrl: string) {
       console.log(`Deleted Supabase storage file: ${fileName}`);
     }
   } catch (err) {
-    console.error('Failed to delete Supabase storage file:', err);
+    console.warn('Failed to delete Supabase storage file:', err);
   }
 }
 
@@ -98,7 +98,7 @@ export async function getTemplates(): Promise<TemplateData[]> {
       console.log(`[db] Supabase returned ${data?.length ?? 0} templates`);
       return (data ?? []) as TemplateData[];
     } catch (err) {
-      console.error('[db] Supabase getTemplates failed, falling back to local:', err);
+      console.warn('[db] Supabase getTemplates failed, falling back to local:', err);
     }
   } else {
     console.log('[db] Supabase not configured, using local JSON fallback');
@@ -126,7 +126,7 @@ export async function createTemplate(data: TemplateData): Promise<boolean> {
       if (error) throw error;
       return true;
     } catch (err) {
-      console.error('Supabase createTemplate failed, falling back to local:', err);
+      console.warn('Supabase createTemplate failed, falling back to local:', err);
     }
   }
 
@@ -182,7 +182,7 @@ export async function updateTemplate(
       if (error) throw error;
       return true;
     } catch (err) {
-      console.error('Supabase updateTemplate failed, falling back to local:', err);
+      console.warn('Supabase updateTemplate failed, falling back to local:', err);
     }
   }
 
@@ -249,7 +249,7 @@ export async function deleteTemplate(key: string): Promise<boolean> {
       }
       return true;
     } catch (err) {
-      console.error('Supabase deleteTemplate failed, falling back to local:', err);
+      console.warn('Supabase deleteTemplate failed, falling back to local:', err);
     }
   }
 
@@ -288,7 +288,7 @@ export async function uploadThumbnail(file: File): Promise<string | null> {
 
       return publicUrlData.publicUrl;
     } catch (err) {
-      console.error('Supabase uploadThumbnail failed, falling back to local:', err);
+      console.warn('Supabase uploadThumbnail failed, falling back to local:', err);
     }
   }
 
@@ -368,7 +368,7 @@ export async function getContactSettings(): Promise<ContactSettings> {
         return data.value as ContactSettings;
       }
     } catch (err) {
-      console.error('[db] Supabase getContactSettings failed, falling back to local:', err);
+      console.warn('[db] Supabase getContactSettings failed, falling back to local:', err);
     }
   }
   return readLocalContact();
@@ -383,7 +383,7 @@ export async function updateContactSettings(settings: ContactSettings): Promise<
 
       if (error) throw error;
     } catch (err) {
-      console.error('[db] Supabase updateContactSettings failed, falling back to local:', err);
+      console.warn('[db] Supabase updateContactSettings failed, falling back to local:', err);
     }
   }
   writeLocalContact(settings);
@@ -396,6 +396,7 @@ export interface ContactLead {
   email: string;
   phone: string;
   message: string;
+  status?: 'pending' | 'completed';
   createdAt?: string;
 }
 
@@ -407,7 +408,8 @@ function readLocalLeads(): ContactLead[] {
       return [];
     }
     const data = fs.readFileSync(LEADS_JSON_PATH, 'utf-8');
-    return JSON.parse(data);
+    const leads = JSON.parse(data) as ContactLead[];
+    return leads.map((l) => ({ ...l, status: l.status || 'pending' }));
   } catch (error) {
     console.error('Error reading local leads:', error);
     return [];
@@ -432,6 +434,7 @@ export async function createContactLead(
   const newLead: ContactLead = {
     ...lead,
     id: Date.now().toString() + Math.random().toString(36).substring(2, 6),
+    status: lead.status || 'pending',
     createdAt: new Date().toISOString(),
   };
 
@@ -443,12 +446,13 @@ export async function createContactLead(
           email: lead.email,
           phone: lead.phone,
           message: lead.message,
+          status: lead.status || 'pending',
         },
       ]);
       if (error) throw error;
       return true;
     } catch (err) {
-      console.error('[db] Supabase createContactLead failed, falling back to local:', err);
+      console.warn('[db] Supabase createContactLead failed, falling back to local:', err);
     }
   }
 
@@ -464,18 +468,44 @@ export async function getContactLeads(): Promise<ContactLead[]> {
     try {
       const { data, error } = await supabase
         .from('contacts')
-        .select('id, name, email, phone, message, createdAt:created_at')
+        .select('id, name, email, phone, message, status, createdAt:created_at')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       return (data ?? []) as ContactLead[];
     } catch (err) {
-      console.error('[db] Supabase getContactLeads failed, falling back to local:', err);
+      console.warn('[db] Supabase getContactLeads failed, falling back to local:', err);
     }
   }
 
   // Local JSON read
   return readLocalLeads();
+}
+
+export async function updateContactLeadStatus(
+  id: number | string,
+  status: 'pending' | 'completed',
+): Promise<boolean> {
+  if (isSupabaseEnabled && supabase) {
+    try {
+      const parsedId = typeof id === 'string' && !isNaN(Number(id)) ? Number(id) : id;
+      const { error } = await supabase.from('contacts').update({ status }).eq('id', parsedId);
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.warn('[db] Supabase updateContactLeadStatus failed, falling back to local:', err);
+    }
+  }
+
+  // Local JSON write
+  const leads = readLocalLeads();
+  const index = leads.findIndex((l) => l.id === id);
+  if (index !== -1) {
+    leads[index].status = status;
+    writeLocalLeads(leads);
+    return true;
+  }
+  return false;
 }
 
 export async function deleteContactLead(id: number | string): Promise<boolean> {
@@ -487,7 +517,7 @@ export async function deleteContactLead(id: number | string): Promise<boolean> {
       if (error) throw error;
       return true;
     } catch (err) {
-      console.error('[db] Supabase deleteContactLead failed, falling back to local:', err);
+      console.warn('[db] Supabase deleteContactLead failed, falling back to local:', err);
     }
   }
 

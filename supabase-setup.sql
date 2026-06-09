@@ -112,8 +112,12 @@ CREATE TABLE IF NOT EXISTS public.contacts (
   email        TEXT NOT NULL,
   phone        TEXT NOT NULL,
   message      TEXT,
+  status       TEXT NOT NULL DEFAULT 'pending',
   created_at   TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Thêm cột status nếu bảng đã tồn tại từ trước nhưng chưa có cột này
+ALTER TABLE public.contacts ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending';
 
 -- Bật RLS cho bảng contacts
 ALTER TABLE public.contacts ENABLE ROW LEVEL SECURITY;
@@ -122,6 +126,7 @@ ALTER TABLE public.contacts ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow public insert contacts" ON public.contacts;
 DROP POLICY IF EXISTS "Allow admin select contacts" ON public.contacts;
 DROP POLICY IF EXISTS "Allow admin delete contacts" ON public.contacts;
+DROP POLICY IF EXISTS "Allow admin update contacts" ON public.contacts;
 
 -- Tạo policies cho bảng contacts
 -- Khách truy cập được phép gửi thông tin liên hệ (INSERT)
@@ -141,6 +146,13 @@ CREATE POLICY "Allow admin delete contacts"
   ON public.contacts FOR DELETE
   TO anon, authenticated
   USING (true);
+
+-- Admin được cập nhật trạng thái liên hệ (UPDATE)
+CREATE POLICY "Allow admin update contacts"
+  ON public.contacts FOR UPDATE
+  TO anon, authenticated
+  USING (true)
+  WITH CHECK (true);
 
 -- ============================================================
 -- XONG! Sau khi chạy xong, quay lại trang Admin là có thể dùng.
