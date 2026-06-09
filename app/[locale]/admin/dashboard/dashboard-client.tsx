@@ -16,6 +16,8 @@ import {
   RiCheckLine,
   RiArrowRightLine,
   RiArrowLeftLine,
+  RiArrowUpLine,
+  RiArrowDownLine,
   RiImageLine,
   RiLink,
   RiTranslate2,
@@ -53,6 +55,311 @@ interface DashboardClientProps {
   initialContactSettings: ContactSettings;
   initialLeads: ContactLead[];
   initialPricingPlans: PricingPlan[];
+}
+
+// ─── Features Builder & helpers ──────────────────────────────────────────────
+interface FeatureItem {
+  id: string;
+  type: 'simple' | 'section' | 'check' | 'cross' | 'ai-box' | 'ai-item' | 'accordion';
+  text?: string;
+  sectionName?: string;
+  aiTitle?: string;
+  aiDesc?: string;
+  accTitle?: string;
+  accContent?: string;
+  accIsNew?: boolean;
+}
+
+const stringListToObjects = (arr: string[]): FeatureItem[] => {
+  return arr.map((f, index) => {
+    const trimmed = f.trim();
+    const id = `${Date.now()}-${index}-${Math.random()}`;
+
+    if (trimmed.startsWith('[section]')) {
+      return {
+        id,
+        type: 'section',
+        sectionName: trimmed.replace('[section]', '').trim(),
+      };
+    } else if (trimmed.startsWith('[ai-box]')) {
+      const content = trimmed.replace('[ai-box]', '').trim();
+      const parts = content.split('|');
+      return {
+        id,
+        type: 'ai-box',
+        aiTitle: parts[0]?.trim() || '',
+        aiDesc: parts[1]?.trim() || '',
+      };
+    } else if (trimmed.startsWith('[ai-item]')) {
+      return {
+        id,
+        type: 'ai-item',
+        text: trimmed.replace('[ai-item]', '').trim(),
+      };
+    } else if (trimmed.startsWith('[accordion]')) {
+      const content = trimmed.replace('[accordion]', '').trim();
+      const parts = content.split('|');
+      const title = parts[0]?.trim() || '';
+      const body = parts[1]?.trim() || '';
+      const accIsNew = title.includes('[MỚI]');
+      const accTitle = title.replace('[MỚI]', '').trim();
+      return {
+        id,
+        type: 'accordion',
+        accTitle,
+        accContent: body,
+        accIsNew,
+      };
+    } else if (trimmed.startsWith('[check]')) {
+      return {
+        id,
+        type: 'check',
+        text: trimmed.replace('[check]', '').trim(),
+      };
+    } else if (trimmed.startsWith('[cross]')) {
+      return {
+        id,
+        type: 'cross',
+        text: trimmed.replace('[cross]', '').trim(),
+      };
+    } else {
+      return {
+        id,
+        type: 'simple',
+        text: trimmed,
+      };
+    }
+  });
+};
+
+const objectsToStringList = (items: FeatureItem[]): string[] => {
+  return items
+    .map((item) => {
+      switch (item.type) {
+        case 'section':
+          return `[section] ${item.sectionName || ''}`;
+        case 'ai-box':
+          return `[ai-box] ${item.aiTitle || ''} | ${item.aiDesc || ''}`;
+        case 'ai-item':
+          return `[ai-item] ${item.text || ''}`;
+        case 'accordion':
+          const titleSuffix = item.accIsNew ? ' [MỚI]' : '';
+          return `[accordion] ${item.accTitle || ''}${titleSuffix} | ${item.accContent || ''}`;
+        case 'check':
+          return `[check] ${item.text || ''}`;
+        case 'cross':
+          return `[cross] ${item.text || ''}`;
+        case 'simple':
+        default:
+          return item.text || '';
+      }
+    })
+    .map((s) => s.trim())
+    .filter(Boolean);
+};
+
+function FeaturesBuilder({
+  list,
+  setList,
+}: {
+  list: FeatureItem[];
+  setList: React.Dispatch<React.SetStateAction<FeatureItem[]>>;
+}) {
+  const addFeature = () => {
+    setList((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}-${Math.random()}`,
+        type: 'simple',
+        text: '',
+      },
+    ]);
+  };
+
+  const removeFeature = (id: string) => {
+    setList((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const moveFeature = (index: number, direction: 'up' | 'down') => {
+    setList((prev) => {
+      const next = [...prev];
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= next.length) return prev;
+      const temp = next[index];
+      next[index] = next[targetIndex];
+      next[targetIndex] = temp;
+      return next;
+    });
+  };
+
+  const updateFeature = (id: string, fields: Partial<FeatureItem>) => {
+    setList((prev) => prev.map((item) => (item.id === id ? { ...item, ...fields } : item)));
+  };
+
+  return (
+    <div className='space-y-4'>
+      <div className='space-y-3 max-h-[300px] overflow-y-auto pr-1 border border-slate-805/40 rounded-2xl p-3 bg-slate-950/20'>
+        {list.length === 0 ? (
+          <div className='text-center py-6 text-slate-500 text-xs border border-dashed border-slate-800/80 rounded-xl'>
+            Chưa có tính năng nào. Nhấp vào nút bên dưới để thêm.
+          </div>
+        ) : (
+          list.map((item, index) => (
+            <div
+              key={item.id}
+              className='p-3.5 bg-slate-900/20 border border-slate-800/60 rounded-2xl space-y-2.5 transition-all'
+            >
+              <div className='flex items-center justify-between gap-3'>
+                <div className='flex items-center gap-1.5'>
+                  <button
+                    type='button'
+                    onClick={() => moveFeature(index, 'up')}
+                    disabled={index === 0}
+                    className='p-1.5 rounded bg-slate-800/60 hover:bg-slate-700 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer'
+                    title='Di chuyển lên'
+                  >
+                    <RiArrowUpLine className='w-3.5 h-3.5' />
+                  </button>
+                  <button
+                    type='button'
+                    onClick={() => moveFeature(index, 'down')}
+                    disabled={index === list.length - 1}
+                    className='p-1.5 rounded bg-slate-800/60 hover:bg-slate-700 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer'
+                    title='Di chuyển xuống'
+                  >
+                    <RiArrowDownLine className='w-3.5 h-3.5' />
+                  </button>
+                  <span className='text-[10px] text-slate-550 font-mono font-bold ml-1'>
+                    #{index + 1}
+                  </span>
+                </div>
+
+                <div className='flex-1 flex items-center gap-2'>
+                  <select
+                    value={item.type}
+                    onChange={(e) =>
+                      updateFeature(item.id, {
+                        type: e.target.value as FeatureItem['type'],
+                      })
+                    }
+                    className='py-1 px-2 bg-slate-950 border border-slate-800 text-[10px] text-slate-300 rounded-lg focus:outline-none focus:border-primary/50 flex-1 max-w-[170px]'
+                  >
+                    <option value='simple'>Giá trị / Chữ thường</option>
+                    <option value='section'>Phân khu (Section)</option>
+                    <option value='check'>Tick xanh (Hỗ trợ)</option>
+                    <option value='cross'>Chéo đỏ (Không hỗ trợ)</option>
+                    <option value='ai-box'>Hộp AI (Khung chính)</option>
+                    <option value='ai-item'>Dòng AI con</option>
+                    <option value='accordion'>Accordion (Mở rộng)</option>
+                  </select>
+                </div>
+
+                <button
+                  type='button'
+                  onClick={() => removeFeature(item.id)}
+                  className='p-1 rounded bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white transition-colors cursor-pointer'
+                  title='Xóa dòng'
+                >
+                  <RiCloseLine className='w-4 h-4' />
+                </button>
+              </div>
+
+              <div className='grid grid-cols-1 gap-2'>
+                {item.type === 'section' && (
+                  <input
+                    type='text'
+                    value={item.sectionName || ''}
+                    onChange={(e) => updateFeature(item.id, { sectionName: e.target.value })}
+                    placeholder='Tên phân khu (e.g., WEBSITE, CÔNG CỤ TÍCH HỢP...)'
+                    className='w-full py-2 px-3 bg-slate-950/80 border border-slate-800 text-xs text-white rounded-xl focus:outline-none focus:border-primary/50'
+                  />
+                )}
+
+                {item.type === 'ai-box' && (
+                  <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
+                    <input
+                      type='text'
+                      value={item.aiTitle || ''}
+                      onChange={(e) => updateFeature(item.id, { aiTitle: e.target.value })}
+                      placeholder='Tiêu đề (e.g. KHẢ NĂNG AI)'
+                      className='w-full py-2 px-3 bg-slate-950/80 border border-slate-800 text-xs text-white rounded-xl focus:outline-none focus:border-primary/50'
+                    />
+                    <input
+                      type='text'
+                      value={item.aiDesc || ''}
+                      onChange={(e) => updateFeature(item.id, { aiDesc: e.target.value })}
+                      placeholder='Mô tả phụ...'
+                      className='w-full py-2 px-3 bg-slate-950/80 border border-slate-800 text-xs text-white rounded-xl focus:outline-none focus:border-primary/50'
+                    />
+                  </div>
+                )}
+
+                {item.type === 'accordion' && (
+                  <div className='space-y-2'>
+                    <div className='flex items-center gap-4'>
+                      <input
+                        type='text'
+                        value={item.accTitle || ''}
+                        onChange={(e) => updateFeature(item.id, { accTitle: e.target.value })}
+                        placeholder='Tiêu đề Accordion...'
+                        className='flex-1 py-2 px-3 bg-slate-950/80 border border-slate-800 text-xs text-white rounded-xl focus:outline-none focus:border-primary/50'
+                      />
+                      <label className='flex items-center gap-1.5 text-2xs text-slate-400 font-bold select-none cursor-pointer'>
+                        <input
+                          type='checkbox'
+                          checked={item.accIsNew || false}
+                          onChange={(e) => updateFeature(item.id, { accIsNew: e.target.checked })}
+                          className='rounded border-slate-700 bg-slate-900 text-primary focus:ring-0 scale-90'
+                        />
+                        Nhãn &quot;MỚI&quot;
+                      </label>
+                    </div>
+                    <textarea
+                      value={item.accContent || ''}
+                      onChange={(e) => updateFeature(item.id, { accContent: e.target.value })}
+                      placeholder='Nội dung mở rộng...'
+                      rows={2}
+                      className='w-full py-2 px-3 bg-slate-950/80 border border-slate-800 text-xs text-white rounded-xl focus:outline-none focus:border-primary/50 resize-none'
+                    />
+                  </div>
+                )}
+
+                {(item.type === 'simple' ||
+                  item.type === 'check' ||
+                  item.type === 'cross' ||
+                  item.type === 'ai-item') && (
+                  <input
+                    type='text'
+                    value={item.text || ''}
+                    onChange={(e) => updateFeature(item.id, { text: e.target.value })}
+                    placeholder={
+                      item.type === 'check'
+                        ? 'Tính năng được hỗ trợ...'
+                        : item.type === 'cross'
+                          ? 'Tính năng không hỗ trợ...'
+                          : item.type === 'ai-item'
+                            ? 'Dòng con của AI...'
+                            : 'Nhập tính năng... (Hỗ trợ ~~gạch~~ **đậm**)'
+                    }
+                    className='w-full py-2 px-3 bg-slate-950/80 border border-slate-800 text-xs text-white rounded-xl focus:outline-none focus:border-primary/50'
+                  />
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <button
+        type='button'
+        onClick={addFeature}
+        className='w-full py-2 bg-slate-900 border border-dashed border-slate-800 hover:border-primary text-slate-400 hover:text-white text-xs font-black rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer'
+      >
+        <RiAddLine className='w-4.5 h-4.5' />
+        Thêm tính năng
+      </button>
+    </div>
+  );
 }
 
 // ─── Category config ────────────────────────────────────────────────────────
@@ -344,8 +651,8 @@ export default function DashboardClient({
   const [editPlanPriceEn, setEditPlanPriceEn] = useState('');
   const [editPlanPeriodVi, setEditPlanPeriodVi] = useState('');
   const [editPlanPeriodEn, setEditPlanPeriodEn] = useState('');
-  const [editPlanFeaturesVi, setEditPlanFeaturesVi] = useState('');
-  const [editPlanFeaturesEn, setEditPlanFeaturesEn] = useState('');
+  const [editPlanFeaturesListVi, setEditPlanFeaturesListVi] = useState<FeatureItem[]>([]);
+  const [editPlanFeaturesListEn, setEditPlanFeaturesListEn] = useState<FeatureItem[]>([]);
   const [editPlanIsPopular, setEditPlanIsPopular] = useState(false);
   const [editPlanButtonVariant, setEditPlanButtonVariant] = useState<'outline' | 'default'>(
     'outline',
@@ -363,8 +670,8 @@ export default function DashboardClient({
   const [newPlanPriceEn, setNewPlanPriceEn] = useState('');
   const [newPlanPeriodVi, setNewPlanPeriodVi] = useState('');
   const [newPlanPeriodEn, setNewPlanPeriodEn] = useState('');
-  const [newPlanFeaturesVi, setNewPlanFeaturesVi] = useState('');
-  const [newPlanFeaturesEn, setNewPlanFeaturesEn] = useState('');
+  const [newPlanFeaturesListVi, setNewPlanFeaturesListVi] = useState<FeatureItem[]>([]);
+  const [newPlanFeaturesListEn, setNewPlanFeaturesListEn] = useState<FeatureItem[]>([]);
   const [newPlanIsPopular, setNewPlanIsPopular] = useState(false);
   const [newPlanButtonVariant, setNewPlanButtonVariant] = useState<'outline' | 'default'>(
     'outline',
@@ -382,8 +689,8 @@ export default function DashboardClient({
     setEditPlanPriceEn(plan.priceEn);
     setEditPlanPeriodVi(plan.periodVi || '');
     setEditPlanPeriodEn(plan.periodEn || '');
-    setEditPlanFeaturesVi(plan.featuresVi.join('\n'));
-    setEditPlanFeaturesEn(plan.featuresEn.join('\n'));
+    setEditPlanFeaturesListVi(stringListToObjects(plan.featuresVi));
+    setEditPlanFeaturesListEn(stringListToObjects(plan.featuresEn));
     setEditPlanIsPopular(plan.isPopular);
     setEditPlanButtonVariant(plan.buttonVariant);
     setEditPlanSortOrder(plan.sortOrder);
@@ -402,8 +709,8 @@ export default function DashboardClient({
     setNewPlanPriceEn('');
     setNewPlanPeriodVi('');
     setNewPlanPeriodEn('');
-    setNewPlanFeaturesVi('');
-    setNewPlanFeaturesEn('');
+    setNewPlanFeaturesListVi([]);
+    setNewPlanFeaturesListEn([]);
     setNewPlanIsPopular(false);
     setNewPlanButtonVariant('outline');
     setNewPlanSortOrder((plans.length + 1) * 10);
@@ -426,14 +733,8 @@ export default function DashboardClient({
         priceEn: editPlanPriceEn.trim(),
         periodVi: editPlanPeriodVi.trim() || null,
         periodEn: editPlanPeriodEn.trim() || null,
-        featuresVi: editPlanFeaturesVi
-          .split('\n')
-          .map((f) => f.trim())
-          .filter(Boolean),
-        featuresEn: editPlanFeaturesEn
-          .split('\n')
-          .map((f) => f.trim())
-          .filter(Boolean),
+        featuresVi: objectsToStringList(editPlanFeaturesListVi),
+        featuresEn: objectsToStringList(editPlanFeaturesListEn),
         isPopular: editPlanIsPopular,
         buttonVariant: editPlanButtonVariant,
         sortOrder: Number(editPlanSortOrder),
@@ -476,14 +777,8 @@ export default function DashboardClient({
         priceEn: newPlanPriceEn.trim(),
         periodVi: newPlanPeriodVi.trim() || null,
         periodEn: newPlanPeriodEn.trim() || null,
-        featuresVi: newPlanFeaturesVi
-          .split('\n')
-          .map((f) => f.trim())
-          .filter(Boolean),
-        featuresEn: newPlanFeaturesEn
-          .split('\n')
-          .map((f) => f.trim())
-          .filter(Boolean),
+        featuresVi: objectsToStringList(newPlanFeaturesListVi),
+        featuresEn: objectsToStringList(newPlanFeaturesListEn),
         isPopular: newPlanIsPopular,
         buttonVariant: newPlanButtonVariant,
         sortOrder: Number(newPlanSortOrder),
@@ -2084,14 +2379,11 @@ export default function DashboardClient({
                     </div>
                     <div className='space-y-2'>
                       <label className='text-xs font-extrabold text-slate-400 block'>
-                        Danh sách tính năng (Tiếng Việt) - Mỗi dòng một tính năng
+                        Danh sách tính năng (Tiếng Việt) - Trình quản lý tương tác
                       </label>
-                      <textarea
-                        value={editPlanFeaturesVi}
-                        onChange={(e) => setEditPlanFeaturesVi(e.target.value)}
-                        placeholder='Website độc quyền&#10;Tặng bài viết SEO&#10;Hỗ trợ 12 tháng...'
-                        rows={6}
-                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white font-mono rounded-xl focus:outline-none transition-all resize-y'
+                      <FeaturesBuilder
+                        list={editPlanFeaturesListVi}
+                        setList={setEditPlanFeaturesListVi}
                       />
                     </div>
                   </div>
@@ -2149,14 +2441,11 @@ export default function DashboardClient({
                     </div>
                     <div className='space-y-2'>
                       <label className='text-xs font-extrabold text-slate-400 block'>
-                        Features List (English) - One feature per line
+                        Features List (English) - Interactive Builder
                       </label>
-                      <textarea
-                        value={editPlanFeaturesEn}
-                        onChange={(e) => setEditPlanFeaturesEn(e.target.value)}
-                        placeholder='Premium custom design&#10;Free SEO articles&#10;12 months support...'
-                        rows={6}
-                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white font-mono rounded-xl focus:outline-none transition-all resize-y'
+                      <FeaturesBuilder
+                        list={editPlanFeaturesListEn}
+                        setList={setEditPlanFeaturesListEn}
                       />
                     </div>
                   </div>
@@ -2358,14 +2647,11 @@ export default function DashboardClient({
                     </div>
                     <div className='space-y-2'>
                       <label className='text-xs font-extrabold text-slate-400 block'>
-                        Danh sách tính năng (Tiếng Việt) - Mỗi dòng một tính năng
+                        Danh sách tính năng (Tiếng Việt) - Trình quản lý tương tác
                       </label>
-                      <textarea
-                        value={newPlanFeaturesVi}
-                        onChange={(e) => setNewPlanFeaturesVi(e.target.value)}
-                        placeholder='Website độc quyền&#10;Tặng bài viết SEO&#10;Hỗ trợ 12 tháng...'
-                        rows={6}
-                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white font-mono rounded-xl focus:outline-none transition-all resize-y'
+                      <FeaturesBuilder
+                        list={newPlanFeaturesListVi}
+                        setList={setNewPlanFeaturesListVi}
                       />
                     </div>
                   </div>
@@ -2423,14 +2709,11 @@ export default function DashboardClient({
                     </div>
                     <div className='space-y-2'>
                       <label className='text-xs font-extrabold text-slate-400 block'>
-                        Features List (English) - One feature per line
+                        Features List (English) - Interactive Builder
                       </label>
-                      <textarea
-                        value={newPlanFeaturesEn}
-                        onChange={(e) => setNewPlanFeaturesEn(e.target.value)}
-                        placeholder='Premium custom design&#10;Free SEO articles&#10;12 months support...'
-                        rows={6}
-                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white font-mono rounded-xl focus:outline-none transition-all resize-y'
+                      <FeaturesBuilder
+                        list={newPlanFeaturesListEn}
+                        setList={setNewPlanFeaturesListEn}
                       />
                     </div>
                   </div>
