@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { Button } from '@/components/ui/button';
+import { submitContactAction } from '@/app/[locale]/admin/actions';
 
 export default function ContactForm() {
   const t = useTranslations('contact');
@@ -47,11 +48,20 @@ export default function ContactForm() {
 
     setStatus('submitting');
     try {
-      // Simulate API submit call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      setStatus('success');
-      setFormData({ name: '', email: '', phone: '', message: '' });
-    } catch {
+      const res = await submitContactAction({
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        message: formData.message.trim(),
+      });
+      if (res.success) {
+        setStatus('success');
+        setFormData({ name: '', email: '', phone: '', message: '' });
+      } else {
+        setStatus('error');
+      }
+    } catch (err) {
+      console.error('Contact form submission error:', err);
       setStatus('error');
     }
   };

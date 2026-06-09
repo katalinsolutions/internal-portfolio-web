@@ -73,6 +73,87 @@ CREATE POLICY "Allow anon delete thumbnails"
   TO anon, authenticated
   USING (bucket_id = 'thumbnails');
 
+-- 7. Tạo bảng settings cho cấu hình chung (Zalo, Messenger, Hotline, v.v...)
+CREATE TABLE IF NOT EXISTS public.settings (
+  key          TEXT PRIMARY KEY,
+  value        JSONB NOT NULL,
+  updated_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Bật RLS cho bảng settings
+ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
+
+-- Xoá policy cũ nếu có
+DROP POLICY IF EXISTS "Allow public read settings" ON public.settings;
+DROP POLICY IF EXISTS "Allow anon insert/upsert settings" ON public.settings;
+DROP POLICY IF EXISTS "Allow anon update settings" ON public.settings;
+
+-- Tạo policies cho bảng settings
+CREATE POLICY "Allow public read settings"
+  ON public.settings FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+CREATE POLICY "Allow anon insert/upsert settings"
+  ON public.settings FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "Allow anon update settings"
+  ON public.settings FOR UPDATE
+  TO anon, authenticated
+  USING (true)
+  WITH CHECK (true);
+
+-- 8. Tạo bảng contacts để lưu trữ thông tin liên hệ từ khách hàng
+CREATE TABLE IF NOT EXISTS public.contacts (
+  id           BIGSERIAL PRIMARY KEY,
+  name         TEXT NOT NULL,
+  email        TEXT NOT NULL,
+  phone        TEXT NOT NULL,
+  message      TEXT,
+  status       TEXT NOT NULL DEFAULT 'pending',
+  created_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Thêm cột status nếu bảng đã tồn tại từ trước nhưng chưa có cột này
+ALTER TABLE public.contacts ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending';
+
+-- Bật RLS cho bảng contacts
+ALTER TABLE public.contacts ENABLE ROW LEVEL SECURITY;
+
+-- Xoá policy cũ nếu có
+DROP POLICY IF EXISTS "Allow public insert contacts" ON public.contacts;
+DROP POLICY IF EXISTS "Allow admin select contacts" ON public.contacts;
+DROP POLICY IF EXISTS "Allow admin delete contacts" ON public.contacts;
+DROP POLICY IF EXISTS "Allow admin update contacts" ON public.contacts;
+
+-- Tạo policies cho bảng contacts
+-- Khách truy cập được phép gửi thông tin liên hệ (INSERT)
+CREATE POLICY "Allow public insert contacts"
+  ON public.contacts FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (true);
+
+-- Admin được xem danh sách liên hệ (SELECT)
+CREATE POLICY "Allow admin select contacts"
+  ON public.contacts FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+-- Admin được xoá danh sách liên hệ (DELETE)
+CREATE POLICY "Allow admin delete contacts"
+  ON public.contacts FOR DELETE
+  TO anon, authenticated
+  USING (true);
+
+-- Admin được cập nhật trạng thái liên hệ (UPDATE)
+CREATE POLICY "Allow admin update contacts"
+  ON public.contacts FOR UPDATE
+  TO anon, authenticated
+  USING (true)
+  WITH CHECK (true);
+
 -- ============================================================
 -- XONG! Sau khi chạy xong, quay lại trang Admin là có thể dùng.
 -- ============================================================

@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { useTranslations } from 'next-intl';
 import {
   RiMenuLine,
   RiCloseLine,
@@ -18,10 +17,13 @@ import LanguageSwitcher from '@/components/shared/language-switcher';
 
 import { logoDark, logoLight } from '@/assets/images';
 import { Link } from '@/i18n/navigation';
+import { CONTACT_CONFIG } from '@/lib/config';
 
-export default function Header() {
-  const tCommon = useTranslations('common');
+interface HeaderProps {
+  hotline?: string;
+}
 
+export default function Header({ hotline = CONTACT_CONFIG.hotline }: HeaderProps) {
   // Mobile drawer states
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMobileMauWebOpen, setIsMobileMauWebOpen] = useState(false);
@@ -192,14 +194,6 @@ export default function Header() {
           <div className='hidden md:flex items-center gap-3'>
             <ThemeToggle />
             <LanguageSwitcher />
-            <Button
-              className='px-5 py-2 text-sm font-semibold rounded-full bg-primary text-primary-foreground shadow-md hover:bg-primary/95 transition-all'
-              onClick={() => {
-                document.getElementById('contact-section')?.scrollIntoView({ behavior: 'smooth' });
-              }}
-            >
-              {tCommon('contactBtn')}
-            </Button>
           </div>
 
           {/* Mobile menu trigger */}
@@ -317,21 +311,10 @@ export default function Header() {
               asChild
               className='w-full py-6 rounded-xl font-bold text-sm bg-primary text-primary-foreground shadow-md flex items-center justify-center gap-2'
             >
-              <a href='tel:0900000000' onClick={closeMenu}>
+              <a href={`tel:${hotline}`} onClick={closeMenu}>
                 <RiPhoneLine className='w-5 h-5' />
-                Hotline: 090 000 0000
+                Hotline: {hotline.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3')}
               </a>
-            </Button>
-
-            <Button
-              variant='outline'
-              className='w-full py-6 rounded-xl font-bold text-sm border-border'
-              onClick={() => {
-                closeMenu();
-                document.getElementById('contact-section')?.scrollIntoView({ behavior: 'smooth' });
-              }}
-            >
-              {tCommon('contactBtn')}
             </Button>
           </div>
         </div>
