@@ -5,9 +5,221 @@
       "vi": "Tiếng Việt",
       "en": "Tiếng Anh"
     },
-    "theme": "Giao diện"
+    "theme": "Giao diện",
+    "contactBtn": "Liên Hệ Ngay",
+    "backToTop": "Lên đầu trang"
   },
   "auth": {
     "login": "Đăng nhập"
+  },
+  "hero": {
+    "badge": "Giải Pháp Số Toàn Diện",
+    "title": "Thiết Kế Website & Digital Marketing Bứt Phá Doanh Số",
+    "subtitle": "Katalin Solutions đồng hành cùng bạn xây dựng hệ sinh thái số tối ưu: từ thiết kế website chuẩn SEO, xây dựng nội dung đến tối ưu hóa quảng cáo chuyển đổi.",
+    "cta": "Tư vấn miễn phí",
+    "secondary": "Xem dịch vụ"
+  },
+  "services": {
+    "title": "Dịch Vụ Của Chúng Tôi",
+    "subtitle": "Giải pháp toàn diện giúp doanh nghiệp của bạn phát triển mạnh mẽ trên môi trường số.",
+    "web": {
+      "title": "Thiết Kế & Phát Triển Website",
+      "desc": "Website độc quyền, giao diện hiện đại, tối ưu chuẩn SEO và tương thích tuyệt đối trên mọi thiết bị di động.",
+      "subcategories": {
+        "sales": {
+          "title": "Website Bán Hàng",
+          "desc": "Tối ưu giỏ hàng, thanh toán và quản lý đơn hàng cho các shop online, hộ kinh doanh và doanh nghiệp lẻ."
+        },
+        "services": {
+          "title": "Website Dịch Vụ",
+          "desc": "Tích hợp tính năng đặt lịch, giới thiệu dịch vụ chuyên nghiệp cho spa, nha khoa, tư vấn, du lịch..."
+        },
+        "intro": {
+          "title": "Website Giới Thiệu",
+          "desc": "Xây dựng hồ sơ năng lực (portfolio), quảng bá hình ảnh doanh nghiệp và gia tăng độ tin cậy thương hiệu."
+        },
+        "landing": {
+          "title": "Landing Page",
+          "desc": "Trang đơn tập trung tối đa vào chuyển đổi, phục vụ đắc lực cho các chiến dịch chạy quảng cáo thu thập lead."
+        },
+        "custom": {
+          "title": "Thiết Kế Theo Yêu Cầu",
+          "desc": "Lập trình các tính năng độc quyền, tích hợp hệ thống phần mềm quản lý riêng biệt theo yêu cầu kinh doanh."
+        }
+      }
+    },
+    "content": {
+      "title": "Content Marketing & SEO",
+      "desc": "Xây dựng chiến lược nội dung chất lượng cao, giữ chân khách hàng và nâng cao thứ hạng tự nhiên trên Google."
+    },
+    "brand": {
+      "title": "Quản Trị & Nhận Diện Thương Hiệu",
+      "desc": "Định vị hình ảnh chuyên nghiệp, thiết kế logo, bộ nhận diện thương hiệu giúp tăng niềm tin của khách hàng."
+    },
+    "ads": {
+      "title": "Quảng Cáo Tối Ưu Chuyển Đổi",
+      "desc": "Triển khai chiến dịch Ads (Google, Facebook, TikTok) đúng đối tượng mục tiêu, tối đa hóa doanh thu và lợi nhuận."
+    }
+  },
+  "about": {
+    "title": "Về Katalin Solutions",
+    "subtitle": "Đồng hành bứt phá cùng doanh nghiệp",
+    "desc1": "Chúng tôi không chỉ làm website hay chạy quảng cáo, chúng tôi xây dựng giải pháp số đồng bộ giúp doanh nghiệp tối ưu hóa chi phí vận hành và tăng trưởng doanh số vượt trội.",
+    "desc2": "Với đội ngũ chuyên gia giàu kinh nghiệm trong lĩnh vực công nghệ và marketing, Katalin cam kết mang lại sản phẩm chất lượng cao, thiết kế độc quyền và dịch vụ chăm sóc khách hàng chu đáo nhất.",
+    "stats": {
+      "projects": "Dự án hoàn thành",
+      "clients": "Khách hàng hài lòng",
+      "conversion": "Tỉ lệ chuyển đổi tăng",
+      "support": "Hỗ trợ 24/7"
+    }
+  },
+  "portfolio": {
+    "title": "Dự Án Tiêu Biểu",
+    "subtitle": "Những sản phẩm sáng tạo được chúng tôi thiết kế và vận hành hiệu quả.",
+    "categories": {
+      "all": "Tất cả",
+      "web": "Thiết kế Web",
+      "marketing": "Digital Marketing",
+      "brand": "Thương hiệu"
+    },
+    "items": {
+      "proj1": {
+        "title": "E-Commerce Fashion Hub",
+        "desc": "Website thời trang tích hợp thanh toán tự động, tối ưu trải nghiệm mua sắm trên di động."
+      },
+      "proj2": {
+        "title": "Bất Động Sản Luxury Land",
+        "desc": "Nền tảng tìm kiếm và giới thiệu bất động sản cao cấp, tích hợp bản đồ trực quan."
+      },
+      "proj3": {
+        "title": "Chiến Dịch Ads F&B Brand",
+        "desc": "Chiến dịch quảng cáo ẩm thực tăng 180% doanh số trực tuyến trong 3 tháng."
+      }
+    }
+  },
+  "pricing": {
+    "title": "Bảng Giá Dịch Vụ",
+    "subtitle": "Các gói giải pháp được tối ưu hóa cho từng quy mô và nhu cầu doanh nghiệp.",
+    "starter": {
+      "name": "Khởi Nghiệp (Starter)",
+      "desc": "Phù hợp cho các doanh nghiệp mới thành lập hoặc cửa hàng nhỏ cần hiện diện trực tuyến.",
+      "price": "5.9tr",
+      "period": "trọn gói",
+      "features": [
+        "Website cơ bản chuẩn SEO",
+        "Tương thích thiết bị di động",
+        "Bảo mật SSL miễn phí",
+        "Hỗ trợ kỹ thuật 3 tháng"
+      ]
+    },
+    "growth": {
+      "name": "Bứt Phá (Growth)",
+      "desc": "Gói tối ưu cho doanh nghiệp muốn thúc đẩy mạnh mẽ doanh số trực tuyến.",
+      "price": "12.9tr",
+      "period": "trọn gói",
+      "features": [
+        "Thiết kế Website độc quyền cao cấp",
+        "Thiết lập cổng thanh toán & Chatbot",
+        "Tặng 3 bài viết chuẩn SEO chuyên sâu",
+        "Hỗ trợ kỹ thuật & vận hành 12 tháng"
+      ]
+    },
+    "enterprise": {
+      "name": "Doanh Nghiệp (Enterprise)",
+      "desc": "Giải pháp tùy biến toàn diện cho các hệ thống lớn hoặc yêu cầu đặc thù.",
+      "price": "Liên hệ",
+      "period": "tùy biến",
+      "features": [
+        "Website/Web App viết riêng (Custom)",
+        "Tích hợp hệ thống ERP/CRM nội bộ",
+        "Chiến lược SEO & Digital Marketing tổng thể",
+        "Kỹ sư hỗ trợ riêng 24/7"
+      ]
+    }
+  },
+  "testimonials": {
+    "title": "Khách Hàng Nói Gì Về Chúng Tôi",
+    "subtitle": "Niềm tin của quý khách là động lực phát triển lớn nhất của Katalin Solutions.",
+    "list": {
+      "user1": {
+        "name": "Nguyễn Minh Anh",
+        "role": "CEO Luxury Design",
+        "comment": "Website chạy cực nhanh và mượt mà. Đội ngũ Katalin làm việc rất chuyên nghiệp, hỗ trợ tận tình kể cả ngày nghỉ."
+      },
+      "user2": {
+        "name": "Trần Thanh Sơn",
+        "role": "Founder Cafe & Bakery Chain",
+        "comment": "Chiến dịch Ads do Katalin vận hành mang lại lượng khách hàng đều đặn mỗi ngày. Doanh thu của chúng tôi tăng vượt mong đợi!"
+      }
+    }
+  },
+  "contact": {
+    "title": "Liên Hệ Tư Vấn",
+    "subtitle": "Hãy để lại thông tin, chuyên gia của chúng tôi sẽ liên hệ tư vấn giải pháp tối ưu nhất cho bạn trong vòng 15 phút.",
+    "placeholderName": "Họ và tên của bạn",
+    "placeholderEmail": "Địa chỉ Email",
+    "placeholderPhone": "Số điện thoại liên hệ",
+    "placeholderMsg": "Nhu cầu của bạn (Thiết kế web, chạy quảng cáo, thương hiệu...)",
+    "sendBtn": "Gửi thông tin liên hệ",
+    "success": "Gửi thành công! Chúng tôi sẽ liên hệ với bạn sớm nhất.",
+    "error": "Có lỗi xảy ra, vui lòng thử lại sau.",
+    "required": "Trường này là bắt buộc"
+  },
+  "templates": {
+    "title": "Kho Mẫu Website Chuyên Nghiệp",
+    "subtitle": "Khám phá các mẫu giao diện hiện đại, chuẩn SEO và tương thích tuyệt đối trên mọi thiết bị di động.",
+    "sidebar": {
+      "title": "Duyệt theo ngành nghề",
+      "all": "Tất cả mẫu website",
+      "sales": "Mẫu website bán hàng",
+      "services": "Mẫu website dịch vụ",
+      "intro": "Mẫu website giới thiệu",
+      "landing": "Mẫu website Landing page",
+      "uncategorized": "Chưa phân loại",
+      "needHelp": "CẦN CHỐT NHANH?",
+      "needHelpDesc": "Gửi ngành nghề và phong cách bạn muốn.",
+      "needHelpBtn": "Nhận tư vấn ngay"
+    },
+    "search": {
+      "placeholder": "Tìm theo tên mẫu giao diện...",
+      "button": "Tìm mẫu",
+      "showing": "Hiển thị {current} của {total} kết quả",
+      "noResults": "Không tìm thấy mẫu website phù hợp."
+    },
+    "sort": {
+      "default": "Sắp xếp mặc định",
+      "newest": "Mới nhất",
+      "popular": "Xem nhiều nhất"
+    },
+    "card": {
+      "detail": "Xem chi tiết",
+      "demo": "Xem Mẫu"
+    },
+    "items": {
+      "theme1": {
+        "title": "Mẫu Website Bán Hàng Công Nghệ - Radios Home 2",
+        "desc": "Giao diện bán hàng công nghệ, điện máy hiện đại với giỏ hàng và danh mục tối ưu."
+      },
+      "theme2": {
+        "title": "Mẫu Website Bán Hàng Mỹ Phẩm - Avesa Home 2",
+        "desc": "Giao diện cửa hàng mỹ phẩm, spa và chăm sóc sức khỏe sang trọng, tinh tế."
+      },
+      "theme3": {
+        "title": "Mẫu Website Bán Hàng Nông Nghiệp - Vano",
+        "desc": "Giao diện nông sản, thực phẩm sạch và organic trực quan, thân thiện."
+      },
+      "theme4": {
+        "title": "Mẫu Website Dịch Vụ Nhà Hàng - Gofoodie",
+        "desc": "Giao diện ẩm thực, F&B chuyên nghiệp, tích hợp đặt bàn và thực đơn tiện lợi."
+      },
+      "theme5": {
+        "title": "Mẫu Website Bất Động Sản - Terranova",
+        "desc": "Giao diện giới thiệu bất động sản, dự án căn hộ và biệt thự cao cấp."
+      },
+      "theme6": {
+        "title": "Mẫu Website Landing Page - Organic Fresh",
+        "desc": "Trang đơn tập trung bán hàng organic, tối ưu tỷ lệ chuyển đổi chạy ads."
+      }
+    }
   }
 }
