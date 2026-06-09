@@ -73,6 +73,38 @@ CREATE POLICY "Allow anon delete thumbnails"
   TO anon, authenticated
   USING (bucket_id = 'thumbnails');
 
+-- 7. Tạo bảng settings cho cấu hình chung (Zalo, Messenger, Hotline, v.v...)
+CREATE TABLE IF NOT EXISTS public.settings (
+  key          TEXT PRIMARY KEY,
+  value        JSONB NOT NULL,
+  updated_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Bật RLS cho bảng settings
+ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
+
+-- Xoá policy cũ nếu có
+DROP POLICY IF EXISTS "Allow public read settings" ON public.settings;
+DROP POLICY IF EXISTS "Allow anon insert/upsert settings" ON public.settings;
+DROP POLICY IF EXISTS "Allow anon update settings" ON public.settings;
+
+-- Tạo policies cho bảng settings
+CREATE POLICY "Allow public read settings"
+  ON public.settings FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+CREATE POLICY "Allow anon insert/upsert settings"
+  ON public.settings FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "Allow anon update settings"
+  ON public.settings FOR UPDATE
+  TO anon, authenticated
+  USING (true)
+  WITH CHECK (true);
+
 -- ============================================================
 -- XONG! Sau khi chạy xong, quay lại trang Admin là có thể dùng.
 -- ============================================================

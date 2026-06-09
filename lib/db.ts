@@ -312,3 +312,80 @@ export async function uploadThumbnail(file: File): Promise<string | null> {
     return null;
   }
 }
+
+export interface ContactSettings {
+  hotline: string;
+  zaloId: string;
+  messengerId: string;
+}
+
+const SETTINGS_JSON_PATH = path.join(process.cwd(), 'data', 'contact.json');
+
+const DEFAULT_CONTACT: ContactSettings = {
+  hotline: '0900000000',
+  zaloId: '0900000000',
+  messengerId: 'katalinsolutions',
+};
+
+function readLocalContact(): ContactSettings {
+  try {
+    if (!fs.existsSync(SETTINGS_JSON_PATH)) {
+      return DEFAULT_CONTACT;
+    }
+    const data = fs.readFileSync(SETTINGS_JSON_PATH, 'utf-8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error reading local contact:', error);
+    return DEFAULT_CONTACT;
+  }
+}
+
+function writeLocalContact(settings: ContactSettings) {
+  try {
+    const dir = path.dirname(SETTINGS_JSON_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(SETTINGS_JSON_PATH, JSON.stringify(settings, null, 2), 'utf-8');
+  } catch (error) {
+    console.error('Error writing local contact:', error);
+  }
+}
+
+export async function getContactSettings(): Promise<ContactSettings> {
+  if (isSupabaseEnabled && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'contact')
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+      if (data?.value) {
+        return data.value as ContactSettings;
+      }
+    } catch (err) {
+      console.error('[db] Supabase getContactSettings failed, falling back to local:', err);
+    }
+  }
+  return readLocalContact();
+}
+
+export async function updateContactSettings(settings: ContactSettings): Promise<boolean> {
+  if (isSupabaseEnabled && supabase) {
+    try {
+      const { error } = await supabase
+        .from('settings')
+        .upsert({ key: 'contact', value: settings }, { onConflict: 'key' });
+
+      if (error) throw error;
+    } catch (err) {
+      console.error('[db] Supabase updateContactSettings failed, falling back to local:', err);
+    }
+  }
+  writeLocalContact(settings);
+  return true;
+}

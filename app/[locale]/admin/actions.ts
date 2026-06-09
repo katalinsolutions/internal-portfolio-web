@@ -9,6 +9,9 @@ import {
   createTemplate,
   deleteTemplate,
   TemplateData,
+  getContactSettings,
+  updateContactSettings,
+  ContactSettings,
 } from '@/lib/db';
 
 const SESSION_COOKIE_NAME = 'katalin_admin_session';
@@ -195,4 +198,35 @@ export async function uploadThumbnailAction(
  */
 export async function getTemplatesAction() {
   return getTemplates();
+}
+
+/**
+ * Server action to get contact settings.
+ */
+export async function getContactSettingsAction(): Promise<ContactSettings> {
+  return getContactSettings();
+}
+
+/**
+ * Server action to save contact settings (authenticated).
+ */
+export async function saveContactSettingsAction(
+  settings: ContactSettings,
+): Promise<{ success: boolean; error?: string }> {
+  const isAuth = await isAuthenticated();
+  if (!isAuth) {
+    return { success: false, error: 'Chưa đăng nhập hoặc phiên làm việc hết hạn' };
+  }
+
+  try {
+    const success = await updateContactSettings(settings);
+    if (success) {
+      revalidatePath('/', 'layout');
+      return { success: true };
+    }
+    return { success: false, error: 'Cập nhật cấu hình thất bại' };
+  } catch (err) {
+    console.error('saveContactSettingsAction error:', err);
+    return { success: false, error: 'Lỗi máy chủ khi lưu cấu hình' };
+  }
 }

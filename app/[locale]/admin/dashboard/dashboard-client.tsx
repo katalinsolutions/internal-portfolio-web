@@ -26,6 +26,9 @@ import {
   RiFileTextLine,
   RiMegaphoneLine,
   RiLayoutLine,
+  RiSettings4Line,
+  RiPhoneLine,
+  RiMessengerLine,
 } from '@remixicon/react';
 import {
   saveTemplateAction,
@@ -33,12 +36,14 @@ import {
   logoutAdmin,
   createTemplateAction,
   deleteTemplateAction,
+  saveContactSettingsAction,
 } from '../actions';
-import { TemplateData } from '@/lib/db';
+import { TemplateData, ContactSettings } from '@/lib/db';
 import WebsiteLivePreview from '@/components/shared/website-live-preview';
 
 interface DashboardClientProps {
   initialTemplates: TemplateData[];
+  initialContactSettings: ContactSettings;
 }
 
 // ─── Category config ────────────────────────────────────────────────────────
@@ -285,11 +290,51 @@ function CategorySelector({ value, onChange }: { value: string; onChange: (v: st
 }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
-export default function DashboardClient({ initialTemplates }: DashboardClientProps) {
+export default function DashboardClient({
+  initialTemplates,
+  initialContactSettings,
+}: DashboardClientProps) {
   const router = useRouter();
   const [templates, setTemplates] = useState<TemplateData[]>(initialTemplates);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<'all' | string>('all');
+
+  // ── Contact settings state ──
+  const [activeTab, setActiveTab] = useState<'templates' | 'contact'>('templates');
+  const [contactHotline, setContactHotline] = useState(initialContactSettings.hotline);
+  const [contactZaloId, setContactZaloId] = useState(initialContactSettings.zaloId);
+  const [contactMessengerId, setContactMessengerId] = useState(initialContactSettings.messengerId);
+  const [isSavingContact, setIsSavingContact] = useState(false);
+  const [saveContactError, setSaveContactError] = useState<string | null>(null);
+  const [saveContactSuccess, setSaveContactSuccess] = useState(false);
+
+  const handleSaveContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingContact(true);
+    setSaveContactError(null);
+    setSaveContactSuccess(false);
+
+    try {
+      const res = await saveContactSettingsAction({
+        hotline: contactHotline.trim(),
+        zaloId: contactZaloId.trim(),
+        messengerId: contactMessengerId.trim(),
+      });
+
+      if (res.success) {
+        setSaveContactSuccess(true);
+        setTimeout(() => setSaveContactSuccess(false), 3000);
+        router.refresh();
+      } else {
+        setSaveContactError(res.error || 'Lưu cấu hình thất bại');
+      }
+    } catch (err) {
+      console.error('Save contact error:', err);
+      setSaveContactError('Đã xảy ra lỗi hệ thống khi lưu cấu hình');
+    } finally {
+      setIsSavingContact(false);
+    }
+  };
 
   // ── Edit modal state ──
   const [editingTemplate, setEditingTemplate] = useState<TemplateData | null>(null);
@@ -513,185 +558,324 @@ export default function DashboardClient({ initialTemplates }: DashboardClientPro
           </button>
         </div>
 
-        {/* ── Stats Cards ── */}
-        <div className='grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4'>
-          {[
-            { label: 'Tổng số website', value: templates.length, color: 'text-white' },
-            {
-              label: 'Có Thumbnail',
-              value: templates.filter((t) => t.thumbnailUrl).length,
-              color: 'text-primary',
-            },
-            {
-              label: 'Giao diện (Theme)',
-              value: templates.filter((t) => t.key.startsWith('theme')).length,
-              color: 'text-amber-400',
-            },
-            {
-              label: 'Dự án (Project)',
-              value: templates.filter((t) => t.key.startsWith('proj')).length,
-              color: 'text-emerald-400',
-            },
-          ].map((stat) => (
-            <div
-              key={stat.label}
-              className='bg-slate-900/40 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-1'
-            >
-              <span className='text-3xs font-bold text-slate-400 uppercase tracking-wider block'>
-                {stat.label}
-              </span>
-              <span className={`text-2xl font-black ${stat.color}`}>{stat.value}</span>
-            </div>
-          ))}
-          <div className='bg-slate-900/40 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-1 col-span-2 sm:col-span-1'>
-            <span className='text-3xs font-bold text-slate-400 uppercase tracking-wider block'>
-              Lưu trữ
-            </span>
-            <span className='text-xs font-extrabold text-white flex items-center gap-1.5 pt-1.5'>
-              {process.env.NEXT_PUBLIC_SUPABASE_URL ? (
-                <>
-                  <span className='w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse' />
-                  Supabase Cloud
-                </>
-              ) : (
-                <>
-                  <span className='w-2.5 h-2.5 rounded-full bg-amber-500' />
-                  Local JSON
-                </>
-              )}
-            </span>
-          </div>
+        {/* ── Tab Switcher ── */}
+        <div className='flex gap-1.5 border-b border-slate-800 pb-px mb-6'>
+          <button
+            onClick={() => setActiveTab('templates')}
+            className={`px-5 py-3 text-xs font-extrabold border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === 'templates'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <RiLayoutLine className='w-4 h-4' />
+            Danh sách website mẫu ({templates.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('contact')}
+            className={`px-5 py-3 text-xs font-extrabold border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === 'contact'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <RiSettings4Line className='w-4 h-4' />
+            Cấu hình liên hệ
+          </button>
         </div>
 
-        {/* ── Toolbar ── */}
-        <div className='bg-slate-900/40 border border-slate-800 rounded-3xl p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4'>
-          {/* Search */}
-          <div className='relative flex-1 max-w-md'>
-            <RiSearchLine className='absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500' />
-            <input
-              type='text'
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder='Tìm theo mã, tên hoặc link demo...'
-              className='w-full py-2.5 pl-10.5 pr-4 bg-slate-950/40 border border-slate-800 focus:border-primary/50 text-sm text-white placeholder-slate-600 rounded-xl focus:outline-none transition-all'
-            />
-          </div>
+        {activeTab === 'templates' ? (
+          <>
+            {/* ── Stats Cards ── */}
+            <div className='grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4'>
+              {[
+                { label: 'Tổng số website', value: templates.length, color: 'text-white' },
+                {
+                  label: 'Có Thumbnail',
+                  value: templates.filter((t) => t.thumbnailUrl).length,
+                  color: 'text-primary',
+                },
+                {
+                  label: 'Giao diện (Theme)',
+                  value: templates.filter((t) => t.key.startsWith('theme')).length,
+                  color: 'text-amber-400',
+                },
+                {
+                  label: 'Dự án (Project)',
+                  value: templates.filter((t) => t.key.startsWith('proj')).length,
+                  color: 'text-emerald-400',
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className='bg-slate-900/40 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-1'
+                >
+                  <span className='text-3xs font-bold text-slate-400 uppercase tracking-wider block'>
+                    {stat.label}
+                  </span>
+                  <span className={`text-2xl font-black ${stat.color}`}>{stat.value}</span>
+                </div>
+              ))}
+              <div className='bg-slate-900/40 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-1 col-span-2 sm:col-span-1'>
+                <span className='text-3xs font-bold text-slate-400 uppercase tracking-wider block'>
+                  Lưu trữ
+                </span>
+                <span className='text-xs font-extrabold text-white flex items-center gap-1.5 pt-1.5'>
+                  {process.env.NEXT_PUBLIC_SUPABASE_URL ? (
+                    <>
+                      <span className='w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse' />
+                      Supabase Cloud
+                    </>
+                  ) : (
+                    <>
+                      <span className='w-2.5 h-2.5 rounded-full bg-amber-500' />
+                      Local JSON
+                    </>
+                  )}
+                </span>
+              </div>
+            </div>
 
-          <div className='flex flex-wrap items-center gap-2 w-full md:w-auto justify-between md:justify-end'>
-            {/* Category Tabs */}
-            <div className='flex flex-wrap gap-1.5'>
-              {categories.map((cat) => {
-                const cfg = getCatConfig(cat);
+            {/* ── Toolbar ── */}
+            <div className='bg-slate-900/40 border border-slate-800 rounded-3xl p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4'>
+              {/* Search */}
+              <div className='relative flex-1 max-w-md'>
+                <RiSearchLine className='absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500' />
+                <input
+                  type='text'
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder='Tìm theo mã, tên hoặc link demo...'
+                  className='w-full py-2.5 pl-10.5 pr-4 bg-slate-950/40 border border-slate-800 focus:border-primary/50 text-sm text-white placeholder-slate-600 rounded-xl focus:outline-none transition-all'
+                />
+              </div>
+
+              <div className='flex flex-wrap items-center gap-2 w-full md:w-auto justify-between md:justify-end'>
+                {/* Category Tabs */}
+                <div className='flex flex-wrap gap-1.5'>
+                  {categories.map((cat) => {
+                    const cfg = getCatConfig(cat);
+                    return (
+                      <button
+                        key={cat}
+                        onClick={() => setActiveCategoryFilter(cat)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                          activeCategoryFilter === cat
+                            ? 'bg-primary text-white border-primary shadow-sm'
+                            : 'bg-slate-950/30 border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {cat === 'all' ? 'Tất cả' : cfg.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className='h-6 w-px bg-slate-800 hidden sm:block' />
+                {/* Add button */}
+                <button
+                  onClick={openCreateModal}
+                  className='px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-extrabold rounded-xl shadow-lg shadow-emerald-950/30 flex items-center gap-2 cursor-pointer transition-all'
+                >
+                  <RiAddLine className='w-4.5 h-4.5' />
+                  Thêm website mẫu
+                </button>
+              </div>
+            </div>
+
+            {/* ── Template Grid ── */}
+            <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+              {filteredTemplates.map((template) => {
+                const cfg = getCatConfig(template.category);
                 return (
-                  <button
-                    key={cat}
-                    onClick={() => setActiveCategoryFilter(cat)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                      activeCategoryFilter === cat
-                        ? 'bg-primary text-white border-primary shadow-sm'
-                        : 'bg-slate-950/30 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
+                  <div
+                    key={template.key}
+                    className='bg-slate-900/40 border border-slate-800/80 rounded-3xl overflow-hidden shadow-md flex flex-col hover:border-slate-700 transition-all group'
                   >
-                    {cat === 'all' ? 'Tất cả' : cfg.label}
-                  </button>
+                    {/* Live scroll preview */}
+                    <div className='relative border-b border-slate-800 overflow-hidden'>
+                      <WebsiteLivePreview
+                        src={template.demoPath}
+                        thumbnailUrl={template.thumbnailUrl}
+                        alt={template.key}
+                        height={180}
+                        active={!isModalOpen}
+                      />
+                      <span
+                        className={`absolute top-3 left-3 z-20 border rounded-full px-2.5 py-1 text-4xs font-extrabold uppercase tracking-wider flex items-center gap-1 bg-slate-900/80 backdrop-blur-sm ${cfg.color}`}
+                      >
+                        {cfg.icon}
+                        {cfg.label}
+                      </span>
+                      <span className='absolute top-3 right-3 z-20 bg-slate-900/80 text-slate-300 font-mono text-3xs font-bold px-2 py-1 rounded-md border border-slate-700 backdrop-blur-sm'>
+                        {template.key.toUpperCase()}
+                      </span>
+                    </div>
+
+                    {/* Content */}
+                    <div className='p-5 flex-1 flex flex-col justify-between gap-4'>
+                      <div className='space-y-2.5'>
+                        <div>
+                          <h3 className='text-sm font-bold text-white line-clamp-1'>
+                            {template.titleVi || `[Code] ${template.key}`}
+                          </h3>
+                          <p className='text-xs text-slate-400 line-clamp-1 italic'>
+                            {template.titleEn || 'Chưa có tên tiếng Anh'}
+                          </p>
+                        </div>
+                        <div className='flex items-center gap-1.5 text-3xs text-slate-400 font-mono bg-slate-950/30 border border-slate-800/50 px-3 py-1.5 rounded-lg'>
+                          <RiLink className='w-3 h-3 flex-shrink-0' />
+                          <span className='line-clamp-1 select-all'>{template.demoPath}</span>
+                        </div>
+                      </div>
+
+                      <div className='flex gap-2 pt-3 border-t border-slate-800'>
+                        <button
+                          onClick={() => openEditModal(template)}
+                          className='flex-1 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-extrabold rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer'
+                        >
+                          <RiEditLine className='w-4 h-4' />
+                          Chỉnh sửa
+                        </button>
+                        <a
+                          href={template.demoPath}
+                          target='_blank'
+                          rel='noopener noreferrer'
+                          className='px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700/50 transition-all flex items-center justify-center cursor-pointer'
+                          title='Mở link demo'
+                        >
+                          <RiExternalLinkLine className='w-4 h-4' />
+                        </a>
+                        <button
+                          onClick={() => handleDelete(template.key)}
+                          className='px-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl border border-red-500/20 transition-all flex items-center justify-center cursor-pointer'
+                          title='Xóa'
+                        >
+                          <RiDeleteBinLine className='w-4 h-4' />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 );
               })}
+
+              {filteredTemplates.length === 0 && (
+                <div className='col-span-full py-20 text-center text-slate-500 space-y-3 border border-dashed border-slate-800 rounded-3xl bg-slate-900/10'>
+                  <RiGlobalLine className='w-12 h-12 mx-auto text-slate-700' />
+                  <p className='text-sm font-semibold'>Không tìm thấy mẫu website nào</p>
+                </div>
+              )}
             </div>
-            <div className='h-6 w-px bg-slate-800 hidden sm:block' />
-            {/* Add button */}
-            <button
-              onClick={openCreateModal}
-              className='px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-extrabold rounded-xl shadow-lg shadow-emerald-950/30 flex items-center gap-2 cursor-pointer transition-all'
-            >
-              <RiAddLine className='w-4.5 h-4.5' />
-              Thêm website mẫu
-            </button>
-          </div>
-        </div>
+          </>
+        ) : (
+          /* ── Contact Settings Panel ── */
+          <div className='max-w-2xl mx-auto bg-slate-900/40 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-8 shadow-xl animate-fade-in'>
+            <div>
+              <h2 className='text-lg font-black text-white flex items-center gap-2'>
+                <RiSettings4Line className='w-5 h-5 text-primary' />
+                Cấu hình liên hệ
+              </h2>
+              <p className='text-xs text-slate-400 mt-1'>
+                Cấu hình số điện thoại Hotline, tài khoản Zalo và Facebook Messenger hiển thị trên
+                các bong bóng chat nổi.
+              </p>
+            </div>
 
-        {/* ── Template Grid ── */}
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-          {filteredTemplates.map((template) => {
-            const cfg = getCatConfig(template.category);
-            return (
-              <div
-                key={template.key}
-                className='bg-slate-900/40 border border-slate-800/80 rounded-3xl overflow-hidden shadow-md flex flex-col hover:border-slate-700 transition-all group'
-              >
-                {/* Live scroll preview */}
-                <div className='relative border-b border-slate-800 overflow-hidden'>
-                  <WebsiteLivePreview
-                    src={template.demoPath}
-                    thumbnailUrl={template.thumbnailUrl}
-                    alt={template.key}
-                    height={180}
-                    active={!isModalOpen}
-                  />
-                  <span
-                    className={`absolute top-3 left-3 z-20 border rounded-full px-2.5 py-1 text-4xs font-extrabold uppercase tracking-wider flex items-center gap-1 bg-slate-900/80 backdrop-blur-sm ${cfg.color}`}
-                  >
-                    {cfg.icon}
-                    {cfg.label}
-                  </span>
-                  <span className='absolute top-3 right-3 z-20 bg-slate-900/80 text-slate-300 font-mono text-3xs font-bold px-2 py-1 rounded-md border border-slate-700 backdrop-blur-sm'>
-                    {template.key.toUpperCase()}
-                  </span>
-                </div>
-
-                {/* Content */}
-                <div className='p-5 flex-1 flex flex-col justify-between gap-4'>
-                  <div className='space-y-2.5'>
-                    <div>
-                      <h3 className='text-sm font-bold text-white line-clamp-1'>
-                        {template.titleVi || `[Code] ${template.key}`}
-                      </h3>
-                      <p className='text-xs text-slate-400 line-clamp-1 italic'>
-                        {template.titleEn || 'Chưa có tên tiếng Anh'}
-                      </p>
-                    </div>
-                    <div className='flex items-center gap-1.5 text-3xs text-slate-400 font-mono bg-slate-950/30 border border-slate-800/50 px-3 py-1.5 rounded-lg'>
-                      <RiLink className='w-3 h-3 flex-shrink-0' />
-                      <span className='line-clamp-1 select-all'>{template.demoPath}</span>
-                    </div>
-                  </div>
-
-                  <div className='flex gap-2 pt-3 border-t border-slate-800'>
-                    <button
-                      onClick={() => openEditModal(template)}
-                      className='flex-1 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-extrabold rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer'
-                    >
-                      <RiEditLine className='w-4 h-4' />
-                      Chỉnh sửa
-                    </button>
-                    <a
-                      href={template.demoPath}
-                      target='_blank'
-                      rel='noopener noreferrer'
-                      className='px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700/50 transition-all flex items-center justify-center cursor-pointer'
-                      title='Mở link demo'
-                    >
-                      <RiExternalLinkLine className='w-4 h-4' />
-                    </a>
-                    <button
-                      onClick={() => handleDelete(template.key)}
-                      className='px-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl border border-red-500/20 transition-all flex items-center justify-center cursor-pointer'
-                      title='Xóa'
-                    >
-                      <RiDeleteBinLine className='w-4 h-4' />
-                    </button>
-                  </div>
-                </div>
+            <form onSubmit={handleSaveContact} className='space-y-6'>
+              {/* Hotline */}
+              <div className='space-y-2'>
+                <label className='text-xs font-extrabold text-slate-300 flex items-center gap-2'>
+                  <RiPhoneLine className='w-4 h-4 text-emerald-400' />
+                  Số điện thoại Hotline
+                </label>
+                <input
+                  type='text'
+                  value={contactHotline}
+                  onChange={(e) => setContactHotline(e.target.value)}
+                  placeholder='Ví dụ: 0900000000'
+                  className='w-full py-3.5 px-4 bg-slate-950/40 border border-slate-800 focus:border-primary/60 text-sm text-white placeholder-slate-700 rounded-xl focus:outline-none transition-all'
+                  required
+                />
+                <p className='text-3xs text-slate-500'>
+                  Số điện thoại nhận cuộc gọi trực tiếp khi khách hàng nhấn nút Hotline.
+                </p>
               </div>
-            );
-          })}
 
-          {filteredTemplates.length === 0 && (
-            <div className='col-span-full py-20 text-center text-slate-500 space-y-3 border border-dashed border-slate-800 rounded-3xl bg-slate-900/10'>
-              <RiGlobalLine className='w-12 h-12 mx-auto text-slate-700' />
-              <p className='text-sm font-semibold'>Không tìm thấy mẫu website nào</p>
-            </div>
-          )}
-        </div>
+              {/* Zalo SĐT */}
+              <div className='space-y-2'>
+                <label className='text-xs font-extrabold text-slate-300 flex items-center gap-2'>
+                  <span className='w-4 h-4 rounded bg-blue-500/10 text-blue-400 text-3xs font-black flex items-center justify-center border border-blue-500/20'>
+                    Z
+                  </span>
+                  Hotline Zalo (SĐT hoặc Zalo ID)
+                </label>
+                <input
+                  type='text'
+                  value={contactZaloId}
+                  onChange={(e) => setContactZaloId(e.target.value)}
+                  placeholder='Ví dụ: 0900000000'
+                  className='w-full py-3.5 px-4 bg-slate-950/40 border border-slate-800 focus:border-primary/60 text-sm text-white placeholder-slate-700 rounded-xl focus:outline-none transition-all'
+                  required
+                />
+                <p className='text-3xs text-slate-500'>
+                  Số điện thoại đăng ký Zalo hoặc QR ID để mở trực tiếp khung chat Zalo.
+                </p>
+              </div>
+
+              {/* Messenger Username */}
+              <div className='space-y-2'>
+                <label className='text-xs font-extrabold text-slate-300 flex items-center gap-2'>
+                  <RiMessengerLine className='w-4 h-4 text-purple-400' />
+                  Facebook Messenger ID (Username)
+                </label>
+                <input
+                  type='text'
+                  value={contactMessengerId}
+                  onChange={(e) => setContactMessengerId(e.target.value)}
+                  placeholder='Ví dụ: katalinsolutions'
+                  className='w-full py-3.5 px-4 bg-slate-950/40 border border-slate-800 focus:border-primary/60 text-sm text-white placeholder-slate-700 rounded-xl focus:outline-none transition-all'
+                  required
+                />
+                <p className='text-3xs text-slate-500'>
+                  Tên định danh (username) của Trang Fanpage Facebook để mở trực tiếp khung chat
+                  Messenger.
+                </p>
+              </div>
+
+              {/* Status Feedback */}
+              {saveContactError && (
+                <div className='p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 font-semibold'>
+                  ⚠️ {saveContactError}
+                </div>
+              )}
+
+              {saveContactSuccess && (
+                <div className='p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-400 font-bold flex items-center gap-1.5 animate-pulse'>
+                  <RiCheckLine className='w-4 h-4' />
+                  Lưu cấu hình thành công! Thông tin ngoài trang chủ đã được cập nhật.
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                type='submit'
+                disabled={isSavingContact}
+                className='w-full py-3.5 bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-extrabold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 cursor-pointer'
+              >
+                {isSavingContact ? (
+                  <>
+                    <RiLoader4Line className='w-4 h-4 animate-spin' />
+                    Đang lưu cấu hình...
+                  </>
+                ) : (
+                  <>
+                    <RiCheckLine className='w-4 h-4' />
+                    Lưu cấu hình
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        )}
       </div>
 
       {/* ════════════════════════════════════════════════════════════════════
