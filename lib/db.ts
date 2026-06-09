@@ -531,3 +531,190 @@ export async function deleteContactLead(id: number | string): Promise<boolean> {
   }
   return false;
 }
+
+// ----------------------------------------------------------------
+// PRICING PLANS HANDLERS
+// ----------------------------------------------------------------
+
+export interface PricingPlan {
+  key: string;
+  nameVi: string;
+  nameEn: string;
+  descVi: string | null;
+  descEn: string | null;
+  priceVi: string;
+  priceEn: string;
+  periodVi: string | null;
+  periodEn: string | null;
+  featuresVi: string[];
+  featuresEn: string[];
+  isPopular: boolean;
+  buttonVariant: 'outline' | 'default';
+  sortOrder: number;
+}
+
+const PLANS_JSON_PATH = path.join(process.cwd(), 'data', 'pricing_plans.json');
+
+function readLocalPlans(): PricingPlan[] {
+  try {
+    if (!fs.existsSync(PLANS_JSON_PATH)) {
+      return [];
+    }
+    const data = fs.readFileSync(PLANS_JSON_PATH, 'utf-8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error reading local plans:', error);
+    return [];
+  }
+}
+
+function writeLocalPlans(plans: PricingPlan[]) {
+  try {
+    const dir = path.dirname(PLANS_JSON_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(PLANS_JSON_PATH, JSON.stringify(plans, null, 2), 'utf-8');
+  } catch (error) {
+    console.error('Error writing local plans:', error);
+  }
+}
+
+export async function getPricingPlans(): Promise<PricingPlan[]> {
+  if (isSupabaseEnabled && supabase) {
+    try {
+      console.log('[db] Fetching pricing plans from Supabase...');
+      const { data, error } = await supabase
+        .from('pricing_plans')
+        .select(
+          'key, nameVi:name_vi, nameEn:name_en, descVi:desc_vi, descEn:desc_en, priceVi:price_vi, priceEn:price_en, periodVi:period_vi, periodEn:period_en, featuresVi:features_vi, featuresEn:features_en, isPopular:is_popular, buttonVariant:button_variant, sortOrder:sort_order',
+        )
+        .order('sort_order', { ascending: true });
+
+      if (error) throw error;
+      console.log(`[db] Supabase returned ${data?.length ?? 0} pricing plans`);
+      return (data ?? []) as PricingPlan[];
+    } catch (err) {
+      console.warn('[db] Supabase getPricingPlans failed, falling back to local:', err);
+    }
+  } else {
+    console.log('[db] Supabase not configured, using local JSON fallback for pricing plans');
+  }
+
+  return readLocalPlans().sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+export async function createPricingPlan(plan: PricingPlan): Promise<boolean> {
+  if (isSupabaseEnabled && supabase) {
+    try {
+      const { error } = await supabase.from('pricing_plans').insert([
+        {
+          key: plan.key,
+          name_vi: plan.nameVi,
+          name_en: plan.nameEn,
+          desc_vi: plan.descVi,
+          desc_en: plan.descEn,
+          price_vi: plan.priceVi,
+          price_en: plan.priceEn,
+          period_vi: plan.periodVi,
+          period_en: plan.periodEn,
+          features_vi: plan.featuresVi,
+          features_en: plan.featuresEn,
+          is_popular: plan.isPopular,
+          button_variant: plan.buttonVariant,
+          sort_order: plan.sortOrder,
+        },
+      ]);
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.warn('Supabase createPricingPlan failed, falling back to local:', err);
+    }
+  }
+
+  const plans = readLocalPlans();
+  const exists = plans.some((p) => p.key === plan.key);
+  if (exists) {
+    return false;
+  }
+  plans.push(plan);
+  writeLocalPlans(plans);
+  return true;
+}
+
+export async function updatePricingPlan(
+  key: string,
+  updatedData: Partial<PricingPlan>,
+): Promise<boolean> {
+  if (isSupabaseEnabled && supabase) {
+    try {
+      const updatePayload: Record<string, string | string[] | boolean | number | null | undefined> =
+        {};
+      if (updatedData.nameVi !== undefined) updatePayload.name_vi = updatedData.nameVi;
+      if (updatedData.nameEn !== undefined) updatePayload.name_en = updatedData.nameEn;
+      if (updatedData.descVi !== undefined) updatePayload.desc_vi = updatedData.descVi;
+      if (updatedData.descEn !== undefined) updatePayload.desc_en = updatedData.descEn;
+      if (updatedData.priceVi !== undefined) updatePayload.price_vi = updatedData.priceVi;
+      if (updatedData.priceEn !== undefined) updatePayload.price_en = updatedData.priceEn;
+      if (updatedData.periodVi !== undefined) updatePayload.period_vi = updatedData.periodVi;
+      if (updatedData.periodEn !== undefined) updatePayload.period_en = updatedData.periodEn;
+      if (updatedData.featuresVi !== undefined) updatePayload.features_vi = updatedData.featuresVi;
+      if (updatedData.featuresEn !== undefined) updatePayload.features_en = updatedData.featuresEn;
+      if (updatedData.isPopular !== undefined) updatePayload.is_popular = updatedData.isPopular;
+      if (updatedData.buttonVariant !== undefined)
+        updatePayload.button_variant = updatedData.buttonVariant;
+      if (updatedData.sortOrder !== undefined) updatePayload.sort_order = updatedData.sortOrder;
+
+      const { error } = await supabase.from('pricing_plans').update(updatePayload).eq('key', key);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.warn('Supabase updatePricingPlan failed, falling back to local:', err);
+    }
+  }
+
+  const plans = readLocalPlans();
+  const index = plans.findIndex((p) => p.key === key);
+  if (index !== -1) {
+    const current = plans[index];
+    if (updatedData.nameVi !== undefined) current.nameVi = updatedData.nameVi;
+    if (updatedData.nameEn !== undefined) current.nameEn = updatedData.nameEn;
+    if (updatedData.descVi !== undefined) current.descVi = updatedData.descVi;
+    if (updatedData.descEn !== undefined) current.descEn = updatedData.descEn;
+    if (updatedData.priceVi !== undefined) current.priceVi = updatedData.priceVi;
+    if (updatedData.priceEn !== undefined) current.priceEn = updatedData.priceEn;
+    if (updatedData.periodVi !== undefined) current.periodVi = updatedData.periodVi;
+    if (updatedData.periodEn !== undefined) current.periodEn = updatedData.periodEn;
+    if (updatedData.featuresVi !== undefined) current.featuresVi = updatedData.featuresVi;
+    if (updatedData.featuresEn !== undefined) current.featuresEn = updatedData.featuresEn;
+    if (updatedData.isPopular !== undefined) current.isPopular = updatedData.isPopular;
+    if (updatedData.buttonVariant !== undefined) current.buttonVariant = updatedData.buttonVariant;
+    if (updatedData.sortOrder !== undefined) current.sortOrder = updatedData.sortOrder;
+
+    writeLocalPlans(plans);
+    return true;
+  }
+  return false;
+}
+
+export async function deletePricingPlan(key: string): Promise<boolean> {
+  if (isSupabaseEnabled && supabase) {
+    try {
+      const { error } = await supabase.from('pricing_plans').delete().eq('key', key);
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.warn('Supabase deletePricingPlan failed, falling back to local:', err);
+    }
+  }
+
+  const plans = readLocalPlans();
+  const index = plans.findIndex((p) => p.key === key);
+  if (index !== -1) {
+    plans.splice(index, 1);
+    writeLocalPlans(plans);
+    return true;
+  }
+  return false;
+}

@@ -154,6 +154,43 @@ CREATE POLICY "Allow admin update contacts"
   USING (true)
   WITH CHECK (true);
 
+-- 9. Tạo bảng pricing_plans để lưu cấu hình bảng giá
+CREATE TABLE IF NOT EXISTS public.pricing_plans (
+  key             TEXT PRIMARY KEY,
+  name_vi         TEXT NOT NULL,
+  name_en         TEXT NOT NULL,
+  desc_vi         TEXT,
+  desc_en         TEXT,
+  price_vi        TEXT NOT NULL,
+  price_en        TEXT NOT NULL,
+  period_vi       TEXT,
+  period_en       TEXT,
+  features_vi     TEXT[] DEFAULT '{}',
+  features_en     TEXT[] DEFAULT '{}',
+  is_popular      BOOLEAN DEFAULT FALSE,
+  button_variant  TEXT DEFAULT 'outline',
+  sort_order      INTEGER DEFAULT 0,
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Bật RLS
+ALTER TABLE public.pricing_plans ENABLE ROW LEVEL SECURITY;
+
+-- Tạo policies truy cập
+DROP POLICY IF EXISTS "Allow public read pricing_plans" ON public.pricing_plans;
+DROP POLICY IF EXISTS "Allow admin write pricing_plans" ON public.pricing_plans;
+
+CREATE POLICY "Allow public read pricing_plans"
+  ON public.pricing_plans FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+CREATE POLICY "Allow admin write pricing_plans"
+  ON public.pricing_plans FOR ALL
+  TO anon, authenticated
+  USING (true)
+  WITH CHECK (true);
+
 -- ============================================================
 -- XONG! Sau khi chạy xong, quay lại trang Admin là có thể dùng.
 -- ============================================================

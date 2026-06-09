@@ -1,0 +1,80 @@
+[
+  {
+    "key": "starter",
+    "nameVi": "Khởi Nghiệp (Starter)",
+    "nameEn": "Starter Plan",
+    "descVi": "Phù hợp cho các doanh nghiệp mới thành lập hoặc cửa hàng nhỏ cần hiện diện trực tuyến.",
+    "descEn": "Ideal for startups, local stores, or personal brands looking to build a digital presence.",
+    "priceVi": "5.9tr",
+    "priceEn": "$250",
+    "periodVi": "trọn gói",
+    "periodEn": "one-time",
+    "featuresVi": [
+      "Website cơ bản chuẩn SEO",
+      "Tương thích thiết bị di động",
+      "Bảo mật SSL miễn phí",
+      "Hỗ trợ kỹ thuật 3 tháng"
+    ],
+    "featuresEn": [
+      "SEO-friendly basic website",
+      "Fully responsive layout",
+      "Free SSL setup",
+      "3 months technical support"
+    ],
+    "isPopular": false,
+    "buttonVariant": "outline",
+    "sortOrder": 10
+  },
+  {
+    "key": "growth",
+    "nameVi": "Bứt Phá (Growth)",
+    "nameEn": "Growth Plan",
+    "descVi": "Gói tối ưu cho doanh nghiệp muốn thúc đẩy mạnh mẽ doanh số trực tuyến.",
+    "descEn": "Perfect for businesses aiming to actively boost online sales and conversion.",
+    "priceVi": "12.9tr",
+    "priceEn": "$550",
+    "periodVi": "trọn gói",
+    "periodEn": "one-time",
+    "featuresVi": [
+      "Thiết kế Website độc quyền cao cấp",
+      "Thiết lập cổng thanh toán & Chatbot",
+      "Tặng 3 bài viết chuẩn SEO chuyên sâu",
+      "Hỗ trợ kỹ thuật & vận hành 12 tháng"
+    ],
+    "featuresEn": [
+      "Bespoke high-end web design",
+      "Payment integration & Chatbot setup",
+      "3 deep-dive SEO articles included",
+      "12 months support & maintenance"
+    ],
+    "isPopular": true,
+    "buttonVariant": "default",
+    "sortOrder": 20
+  },
+  {
+    "key": "enterprise",
+    "nameVi": "Doanh Nghiệp (Enterprise)",
+    "nameEn": "Enterprise Plan",
+    "descVi": "Giải pháp tùy biến toàn diện cho các hệ thống lớn hoặc yêu cầu đặc thù.",
+    "descEn": "Customized end-to-end solutions for larger organizations or custom platforms.",
+    "priceVi": "Liên hệ",
+    "priceEn": "Custom",
+    "periodVi": "tùy biến",
+    "periodEn": "tailored",
+    "featuresVi": [
+      "Website/Web App viết riêng (Custom)",
+      "Tích hợp hệ thống ERP/CRM nội bộ",
+      "Chiến lược SEO & Digital Marketing tổng thể",
+      "Kỹ sư hỗ trợ riêng 24/7"
+    ],
+    "featuresEn": [
+      "Custom web app / database systems",
+      "Internal ERP/CRM integration",
+      "Omnichannel marketing strategy",
+      "Dedicated engineer 24/7"
+    ],
+    "isPopular": false,
+    "buttonVariant": "outline",
+    "sortOrder": 30
+  }
+]
