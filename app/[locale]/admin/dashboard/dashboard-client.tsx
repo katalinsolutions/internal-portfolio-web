@@ -37,13 +37,15 @@ import {
   createTemplateAction,
   deleteTemplateAction,
   saveContactSettingsAction,
+  deleteContactLeadAction,
 } from '../actions';
-import { TemplateData, ContactSettings } from '@/lib/db';
+import { TemplateData, ContactSettings, ContactLead } from '@/lib/db';
 import WebsiteLivePreview from '@/components/shared/website-live-preview';
 
 interface DashboardClientProps {
   initialTemplates: TemplateData[];
   initialContactSettings: ContactSettings;
+  initialLeads: ContactLead[];
 }
 
 // ─── Category config ────────────────────────────────────────────────────────
@@ -293,6 +295,7 @@ function CategorySelector({ value, onChange }: { value: string; onChange: (v: st
 export default function DashboardClient({
   initialTemplates,
   initialContactSettings,
+  initialLeads,
 }: DashboardClientProps) {
   const router = useRouter();
   const [templates, setTemplates] = useState<TemplateData[]>(initialTemplates);
@@ -300,13 +303,36 @@ export default function DashboardClient({
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<'all' | string>('all');
 
   // ── Contact settings state ──
-  const [activeTab, setActiveTab] = useState<'templates' | 'contact'>('templates');
+  const [activeTab, setActiveTab] = useState<'templates' | 'contact' | 'leads'>('templates');
   const [contactHotline, setContactHotline] = useState(initialContactSettings.hotline);
   const [contactZaloId, setContactZaloId] = useState(initialContactSettings.zaloId);
   const [contactMessengerId, setContactMessengerId] = useState(initialContactSettings.messengerId);
   const [isSavingContact, setIsSavingContact] = useState(false);
   const [saveContactError, setSaveContactError] = useState<string | null>(null);
   const [saveContactSuccess, setSaveContactSuccess] = useState(false);
+
+  // ── Leads state ──
+  const [leads, setLeads] = useState<ContactLead[]>(initialLeads);
+  const [isDeletingLead, setIsDeletingLead] = useState<string | number | null>(null);
+
+  const handleDeleteLead = async (id: string | number) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa yêu cầu tư vấn này?')) return;
+    setIsDeletingLead(id);
+    try {
+      const res = await deleteContactLeadAction(id);
+      if (res.success) {
+        setLeads((prev) => prev.filter((l) => l.id !== id));
+        router.refresh();
+      } else {
+        alert(res.error || 'Xóa thất bại');
+      }
+    } catch (err) {
+      console.error('Delete lead error:', err);
+      alert('Lỗi hệ thống khi xóa yêu cầu');
+    } finally {
+      setIsDeletingLead(null);
+    }
+  };
 
   const handleSaveContact = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -559,10 +585,10 @@ export default function DashboardClient({
         </div>
 
         {/* ── Tab Switcher ── */}
-        <div className='flex gap-1.5 border-b border-slate-800 pb-px mb-6'>
+        <div className='flex gap-1.5 border-b border-slate-800 pb-px mb-6 overflow-x-auto scrollbar-none'>
           <button
             onClick={() => setActiveTab('templates')}
-            className={`px-5 py-3 text-xs font-extrabold border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+            className={`px-5 py-3 text-xs font-extrabold border-b-2 transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'templates'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -573,7 +599,7 @@ export default function DashboardClient({
           </button>
           <button
             onClick={() => setActiveTab('contact')}
-            className={`px-5 py-3 text-xs font-extrabold border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+            className={`px-5 py-3 text-xs font-extrabold border-b-2 transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'contact'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -582,9 +608,20 @@ export default function DashboardClient({
             <RiSettings4Line className='w-4 h-4' />
             Cấu hình liên hệ
           </button>
+          <button
+            onClick={() => setActiveTab('leads')}
+            className={`px-5 py-3 text-xs font-extrabold border-b-2 transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'leads'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <RiPhoneLine className='w-4 h-4' />
+            Yêu cầu tư vấn ({leads.length})
+          </button>
         </div>
 
-        {activeTab === 'templates' ? (
+        {activeTab === 'templates' && (
           <>
             {/* ── Stats Cards ── */}
             <div className='grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4'>
@@ -766,7 +803,9 @@ export default function DashboardClient({
               )}
             </div>
           </>
-        ) : (
+        )}
+
+        {activeTab === 'contact' && (
           /* ── Contact Settings Panel ── */
           <div className='max-w-2xl mx-auto bg-slate-900/40 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-8 shadow-xl animate-fade-in'>
             <div>
@@ -874,6 +913,106 @@ export default function DashboardClient({
                 )}
               </button>
             </form>
+          </div>
+        )}
+
+        {activeTab === 'leads' && (
+          /* ── Consultation Leads Panel ── */
+          <div className='bg-slate-900/40 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl animate-fade-in'>
+            <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/60 pb-5'>
+              <div>
+                <h2 className='text-lg font-black text-white flex items-center gap-2'>
+                  <RiPhoneLine className='w-5 h-5 text-primary' />
+                  Yêu cầu tư vấn từ khách hàng
+                </h2>
+                <p className='text-xs text-slate-400 mt-1'>
+                  Danh sách khách hàng đã điền thông tin và gửi yêu cầu tư vấn liên hệ trên website.
+                </p>
+              </div>
+              <span className='bg-slate-800/80 text-slate-300 font-mono text-xs font-bold px-3 py-1.5 rounded-xl border border-slate-700/50 self-start sm:self-center'>
+                Tổng số: {leads.length} yêu cầu
+              </span>
+            </div>
+
+            {leads.length === 0 ? (
+              <div className='py-20 text-center text-slate-500 space-y-3 border border-dashed border-slate-800 rounded-2xl bg-slate-900/10'>
+                <RiPhoneLine className='w-12 h-12 mx-auto text-slate-700 animate-pulse' />
+                <div>
+                  <p className='text-sm font-semibold text-slate-400'>Chưa có yêu cầu tư vấn nào</p>
+                  <p className='text-xs text-slate-600 mt-1'>
+                    Khi khách hàng gửi thông tin liên hệ, yêu cầu sẽ xuất hiện tại đây.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className='overflow-x-auto -mx-6 sm:mx-0'>
+                <div className='inline-block min-w-full align-middle px-6 sm:px-0'>
+                  <div className='overflow-hidden border border-slate-800/60 rounded-2xl bg-slate-950/20'>
+                    <table className='min-w-full divide-y divide-slate-800/60 text-left text-xs'>
+                      <thead className='bg-slate-900/80 text-slate-400 font-bold uppercase tracking-wider text-3xs border-b border-slate-800/60'>
+                        <tr>
+                          <th className='px-6 py-4'>Khách hàng</th>
+                          <th className='px-6 py-4'>Liên hệ</th>
+                          <th className='px-6 py-4'>Nội dung tin nhắn</th>
+                          <th className='px-6 py-4'>Thời gian</th>
+                          <th className='px-6 py-4 text-center'>Thao tác</th>
+                        </tr>
+                      </thead>
+                      <tbody className='divide-y divide-slate-800/40 text-slate-300'>
+                        {leads.map((lead) => (
+                          <tr
+                            key={lead.id}
+                            className='hover:bg-slate-900/30 transition-colors duration-150'
+                          >
+                            <td className='px-6 py-4.5 whitespace-nowrap font-bold text-white'>
+                              {lead.name}
+                            </td>
+                            <td className='px-6 py-4.5 whitespace-nowrap space-y-1'>
+                              <div className='font-semibold'>{lead.phone}</div>
+                              <div className='text-3xs text-slate-500 font-mono'>{lead.email}</div>
+                            </td>
+                            <td className='px-6 py-4.5 max-w-sm'>
+                              <p
+                                className='whitespace-pre-line text-slate-300 line-clamp-3 leading-relaxed'
+                                title={lead.message}
+                              >
+                                {lead.message || '—'}
+                              </p>
+                            </td>
+                            <td className='px-6 py-4.5 whitespace-nowrap text-slate-400 font-mono text-3xs'>
+                              {lead.createdAt
+                                ? new Date(lead.createdAt).toLocaleString('vi-VN', {
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit',
+                                  })
+                                : '—'}
+                            </td>
+                            <td className='px-6 py-4.5 whitespace-nowrap text-center'>
+                              <button
+                                onClick={() => lead.id && handleDeleteLead(lead.id)}
+                                disabled={isDeletingLead === lead.id}
+                                className='p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg border border-red-500/20 transition-all cursor-pointer inline-flex items-center justify-center'
+                                title='Xóa yêu cầu'
+                              >
+                                {isDeletingLead === lead.id ? (
+                                  <RiLoader4Line className='w-4 h-4 animate-spin' />
+                                ) : (
+                                  <RiDeleteBinLine className='w-4 h-4' />
+                                )}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

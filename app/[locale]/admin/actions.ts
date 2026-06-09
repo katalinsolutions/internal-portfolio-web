@@ -12,6 +12,10 @@ import {
   getContactSettings,
   updateContactSettings,
   ContactSettings,
+  createContactLead,
+  getContactLeads,
+  deleteContactLead,
+  ContactLead,
 } from '@/lib/db';
 
 const SESSION_COOKIE_NAME = 'katalin_admin_session';
@@ -228,5 +232,63 @@ export async function saveContactSettingsAction(
   } catch (err) {
     console.error('saveContactSettingsAction error:', err);
     return { success: false, error: 'Lỗi máy chủ khi lưu cấu hình' };
+  }
+}
+
+/**
+ * Public action to submit a new contact request.
+ */
+export async function submitContactAction(
+  lead: Omit<ContactLead, 'id' | 'createdAt'>,
+): Promise<{ success: boolean; error?: string }> {
+  // Basic validation
+  if (!lead.name || !lead.email || !lead.phone) {
+    return { success: false, error: 'Vui lòng cung cấp tên, email và số điện thoại' };
+  }
+  try {
+    const success = await createContactLead(lead);
+    if (success) {
+      // Revalidate dashboard page
+      revalidatePath('/admin/dashboard', 'page');
+      return { success: true };
+    }
+    return { success: false, error: 'Gửi thông tin thất bại' };
+  } catch (err) {
+    console.error('submitContactAction error:', err);
+    return { success: false, error: 'Lỗi hệ thống khi gửi thông tin' };
+  }
+}
+
+/**
+ * Authenticated action to get contact leads list.
+ */
+export async function getContactLeadsAction(): Promise<ContactLead[]> {
+  const isAuth = await isAuthenticated();
+  if (!isAuth) {
+    throw new Error('Chưa đăng nhập hoặc phiên làm việc hết hạn');
+  }
+  return getContactLeads();
+}
+
+/**
+ * Authenticated action to delete a contact lead.
+ */
+export async function deleteContactLeadAction(
+  id: string | number,
+): Promise<{ success: boolean; error?: string }> {
+  const isAuth = await isAuthenticated();
+  if (!isAuth) {
+    return { success: false, error: 'Chưa đăng nhập hoặc phiên làm việc hết hạn' };
+  }
+  try {
+    const success = await deleteContactLead(id);
+    if (success) {
+      revalidatePath('/admin/dashboard', 'page');
+      return { success: true };
+    }
+    return { success: false, error: 'Xóa yêu cầu thất bại' };
+  } catch (err) {
+    console.error('deleteContactLeadAction error:', err);
+    return { success: false, error: 'Lỗi hệ thống khi xóa yêu cầu' };
   }
 }

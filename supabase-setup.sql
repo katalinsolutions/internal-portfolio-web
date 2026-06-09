@@ -105,6 +105,43 @@ CREATE POLICY "Allow anon update settings"
   USING (true)
   WITH CHECK (true);
 
+-- 8. Tạo bảng contacts để lưu trữ thông tin liên hệ từ khách hàng
+CREATE TABLE IF NOT EXISTS public.contacts (
+  id           BIGSERIAL PRIMARY KEY,
+  name         TEXT NOT NULL,
+  email        TEXT NOT NULL,
+  phone        TEXT NOT NULL,
+  message      TEXT,
+  created_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Bật RLS cho bảng contacts
+ALTER TABLE public.contacts ENABLE ROW LEVEL SECURITY;
+
+-- Xoá policy cũ nếu có
+DROP POLICY IF EXISTS "Allow public insert contacts" ON public.contacts;
+DROP POLICY IF EXISTS "Allow admin select contacts" ON public.contacts;
+DROP POLICY IF EXISTS "Allow admin delete contacts" ON public.contacts;
+
+-- Tạo policies cho bảng contacts
+-- Khách truy cập được phép gửi thông tin liên hệ (INSERT)
+CREATE POLICY "Allow public insert contacts"
+  ON public.contacts FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (true);
+
+-- Admin được xem danh sách liên hệ (SELECT)
+CREATE POLICY "Allow admin select contacts"
+  ON public.contacts FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+-- Admin được xoá danh sách liên hệ (DELETE)
+CREATE POLICY "Allow admin delete contacts"
+  ON public.contacts FOR DELETE
+  TO anon, authenticated
+  USING (true);
+
 -- ============================================================
 -- XONG! Sau khi chạy xong, quay lại trang Admin là có thể dùng.
 -- ============================================================

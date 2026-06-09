@@ -389,3 +389,115 @@ export async function updateContactSettings(settings: ContactSettings): Promise<
   writeLocalContact(settings);
   return true;
 }
+
+export interface ContactLead {
+  id?: number | string;
+  name: string;
+  email: string;
+  phone: string;
+  message: string;
+  createdAt?: string;
+}
+
+const LEADS_JSON_PATH = path.join(process.cwd(), 'data', 'contacts.json');
+
+function readLocalLeads(): ContactLead[] {
+  try {
+    if (!fs.existsSync(LEADS_JSON_PATH)) {
+      return [];
+    }
+    const data = fs.readFileSync(LEADS_JSON_PATH, 'utf-8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error reading local leads:', error);
+    return [];
+  }
+}
+
+function writeLocalLeads(leads: ContactLead[]) {
+  try {
+    const dir = path.dirname(LEADS_JSON_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(LEADS_JSON_PATH, JSON.stringify(leads, null, 2), 'utf-8');
+  } catch (error) {
+    console.error('Error writing local leads:', error);
+  }
+}
+
+export async function createContactLead(
+  lead: Omit<ContactLead, 'id' | 'createdAt'>,
+): Promise<boolean> {
+  const newLead: ContactLead = {
+    ...lead,
+    id: Date.now().toString() + Math.random().toString(36).substring(2, 6),
+    createdAt: new Date().toISOString(),
+  };
+
+  if (isSupabaseEnabled && supabase) {
+    try {
+      const { error } = await supabase.from('contacts').insert([
+        {
+          name: lead.name,
+          email: lead.email,
+          phone: lead.phone,
+          message: lead.message,
+        },
+      ]);
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('[db] Supabase createContactLead failed, falling back to local:', err);
+    }
+  }
+
+  // Local JSON write
+  const leads = readLocalLeads();
+  leads.unshift(newLead);
+  writeLocalLeads(leads);
+  return true;
+}
+
+export async function getContactLeads(): Promise<ContactLead[]> {
+  if (isSupabaseEnabled && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('id, name, email, phone, message, createdAt:created_at')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return (data ?? []) as ContactLead[];
+    } catch (err) {
+      console.error('[db] Supabase getContactLeads failed, falling back to local:', err);
+    }
+  }
+
+  // Local JSON read
+  return readLocalLeads();
+}
+
+export async function deleteContactLead(id: number | string): Promise<boolean> {
+  if (isSupabaseEnabled && supabase) {
+    try {
+      // In Supabase, ID might be number, let's parse it if possible
+      const parsedId = typeof id === 'string' && !isNaN(Number(id)) ? Number(id) : id;
+      const { error } = await supabase.from('contacts').delete().eq('id', parsedId);
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('[db] Supabase deleteContactLead failed, falling back to local:', err);
+    }
+  }
+
+  // Local JSON delete
+  const leads = readLocalLeads();
+  const index = leads.findIndex((l) => l.id === id);
+  if (index !== -1) {
+    leads.splice(index, 1);
+    writeLocalLeads(leads);
+    return true;
+  }
+  return false;
+}
