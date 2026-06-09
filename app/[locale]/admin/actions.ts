@@ -17,6 +17,11 @@ import {
   deleteContactLead,
   updateContactLeadStatus,
   ContactLead,
+  getPricingPlans,
+  createPricingPlan,
+  updatePricingPlan,
+  deletePricingPlan,
+  PricingPlan,
 } from '@/lib/db';
 
 const SESSION_COOKIE_NAME = 'katalin_admin_session';
@@ -315,5 +320,94 @@ export async function updateContactLeadStatusAction(
   } catch (err) {
     console.error('updateContactLeadStatusAction error:', err);
     return { success: false, error: 'Lỗi hệ thống khi cập nhật trạng thái' };
+  }
+}
+
+/**
+ * Server action to get all pricing plans.
+ */
+export async function getPricingPlansAction(): Promise<PricingPlan[]> {
+  return getPricingPlans();
+}
+
+/**
+ * Server action to save/update a pricing plan (authenticated).
+ */
+export async function savePricingPlanAction(
+  key: string,
+  plan: Partial<PricingPlan>,
+): Promise<{ success: boolean; error?: string }> {
+  const isAuth = await isAuthenticated();
+  if (!isAuth) {
+    return { success: false, error: 'Chưa đăng nhập hoặc phiên làm việc hết hạn' };
+  }
+
+  try {
+    const success = await updatePricingPlan(key, plan);
+    if (success) {
+      revalidatePath('/', 'layout');
+      return { success: true };
+    }
+    return { success: false, error: 'Không tìm thấy gói dịch vụ cần cập nhật' };
+  } catch (err) {
+    console.error('savePricingPlanAction error:', err);
+    return { success: false, error: 'Lỗi máy chủ khi lưu cấu hình gói dịch vụ' };
+  }
+}
+
+/**
+ * Server action to create a new pricing plan (authenticated).
+ */
+export async function createPricingPlanAction(
+  plan: PricingPlan,
+): Promise<{ success: boolean; error?: string }> {
+  const isAuth = await isAuthenticated();
+  if (!isAuth) {
+    return { success: false, error: 'Chưa đăng nhập hoặc phiên làm việc hết hạn' };
+  }
+
+  // Basic validation
+  if (!plan.key || !plan.nameVi || !plan.nameEn || !plan.priceVi || !plan.priceEn) {
+    return { success: false, error: 'Vui lòng điền đầy đủ các thông tin bắt buộc' };
+  }
+
+  if (!/^[a-zA-Z0-9_-]+$/.test(plan.key)) {
+    return { success: false, error: 'Mã Key chỉ được chứa chữ cái, số, gạch ngang và gạch dưới' };
+  }
+
+  try {
+    const success = await createPricingPlan(plan);
+    if (success) {
+      revalidatePath('/', 'layout');
+      return { success: true };
+    }
+    return { success: false, error: 'Mã Key này đã tồn tại trong hệ thống' };
+  } catch (err) {
+    console.error('createPricingPlanAction error:', err);
+    return { success: false, error: 'Lỗi máy chủ khi thêm gói dịch vụ mới' };
+  }
+}
+
+/**
+ * Server action to delete a pricing plan (authenticated).
+ */
+export async function deletePricingPlanAction(
+  key: string,
+): Promise<{ success: boolean; error?: string }> {
+  const isAuth = await isAuthenticated();
+  if (!isAuth) {
+    return { success: false, error: 'Chưa đăng nhập hoặc phiên làm việc hết hạn' };
+  }
+
+  try {
+    const success = await deletePricingPlan(key);
+    if (success) {
+      revalidatePath('/', 'layout');
+      return { success: true };
+    }
+    return { success: false, error: 'Không tìm thấy gói cần xóa hoặc xóa thất bại' };
+  } catch (err) {
+    console.error('deletePricingPlanAction error:', err);
+    return { success: false, error: 'Lỗi máy chủ khi xóa gói dịch vụ' };
   }
 }

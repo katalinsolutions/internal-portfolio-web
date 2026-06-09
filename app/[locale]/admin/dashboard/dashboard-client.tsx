@@ -41,14 +41,18 @@ import {
   saveContactSettingsAction,
   deleteContactLeadAction,
   updateContactLeadStatusAction,
+  savePricingPlanAction,
+  createPricingPlanAction,
+  deletePricingPlanAction,
 } from '../actions';
-import { TemplateData, ContactSettings, ContactLead } from '@/lib/db';
+import { TemplateData, ContactSettings, ContactLead, PricingPlan } from '@/lib/db';
 import WebsiteLivePreview from '@/components/shared/website-live-preview';
 
 interface DashboardClientProps {
   initialTemplates: TemplateData[];
   initialContactSettings: ContactSettings;
   initialLeads: ContactLead[];
+  initialPricingPlans: PricingPlan[];
 }
 
 // ─── Category config ────────────────────────────────────────────────────────
@@ -299,6 +303,7 @@ export default function DashboardClient({
   initialTemplates,
   initialContactSettings,
   initialLeads,
+  initialPricingPlans,
 }: DashboardClientProps) {
   const router = useRouter();
   const [templates, setTemplates] = useState<TemplateData[]>(initialTemplates);
@@ -306,7 +311,9 @@ export default function DashboardClient({
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<'all' | string>('all');
 
   // ── Contact settings state ──
-  const [activeTab, setActiveTab] = useState<'templates' | 'contact' | 'leads'>('templates');
+  const [activeTab, setActiveTab] = useState<'templates' | 'contact' | 'leads' | 'pricing'>(
+    'templates',
+  );
   const [contactHotline, setContactHotline] = useState(initialContactSettings.hotline);
   const [contactZaloId, setContactZaloId] = useState(initialContactSettings.zaloId);
   const [contactMessengerId, setContactMessengerId] = useState(initialContactSettings.messengerId);
@@ -321,6 +328,198 @@ export default function DashboardClient({
   const [activeStatusFilter, setActiveStatusFilter] = useState<'all' | 'pending' | 'completed'>(
     'all',
   );
+
+  // ── Pricing states ──
+  const [plans, setPlans] = useState<PricingPlan[]>(initialPricingPlans);
+  const [editingPlan, setEditingPlan] = useState<PricingPlan | null>(null);
+  const [isCreatePlanOpen, setIsCreatePlanOpen] = useState(false);
+  const [isSavingPlan, setIsSavingPlan] = useState(false);
+
+  // Edit plan form states
+  const [editPlanNameVi, setEditPlanNameVi] = useState('');
+  const [editPlanNameEn, setEditPlanNameEn] = useState('');
+  const [editPlanDescVi, setEditPlanDescVi] = useState('');
+  const [editPlanDescEn, setEditPlanDescEn] = useState('');
+  const [editPlanPriceVi, setEditPlanPriceVi] = useState('');
+  const [editPlanPriceEn, setEditPlanPriceEn] = useState('');
+  const [editPlanPeriodVi, setEditPlanPeriodVi] = useState('');
+  const [editPlanPeriodEn, setEditPlanPeriodEn] = useState('');
+  const [editPlanFeaturesVi, setEditPlanFeaturesVi] = useState('');
+  const [editPlanFeaturesEn, setEditPlanFeaturesEn] = useState('');
+  const [editPlanIsPopular, setEditPlanIsPopular] = useState(false);
+  const [editPlanButtonVariant, setEditPlanButtonVariant] = useState<'outline' | 'default'>(
+    'outline',
+  );
+  const [editPlanSortOrder, setEditPlanSortOrder] = useState(0);
+  const [editPlanLangTab, setEditPlanLangTab] = useState<'vi' | 'en'>('vi');
+
+  // Create plan form states
+  const [newPlanKey, setNewPlanKey] = useState('');
+  const [newPlanNameVi, setNewPlanNameVi] = useState('');
+  const [newPlanNameEn, setNewPlanNameEn] = useState('');
+  const [newPlanDescVi, setNewPlanDescVi] = useState('');
+  const [newPlanDescEn, setNewPlanDescEn] = useState('');
+  const [newPlanPriceVi, setNewPlanPriceVi] = useState('');
+  const [newPlanPriceEn, setNewPlanPriceEn] = useState('');
+  const [newPlanPeriodVi, setNewPlanPeriodVi] = useState('');
+  const [newPlanPeriodEn, setNewPlanPeriodEn] = useState('');
+  const [newPlanFeaturesVi, setNewPlanFeaturesVi] = useState('');
+  const [newPlanFeaturesEn, setNewPlanFeaturesEn] = useState('');
+  const [newPlanIsPopular, setNewPlanIsPopular] = useState(false);
+  const [newPlanButtonVariant, setNewPlanButtonVariant] = useState<'outline' | 'default'>(
+    'outline',
+  );
+  const [newPlanSortOrder, setNewPlanSortOrder] = useState(10);
+  const [newPlanLangTab, setNewPlanLangTab] = useState<'vi' | 'en'>('vi');
+
+  const openEditPlanModal = (plan: PricingPlan) => {
+    setEditingPlan(plan);
+    setEditPlanNameVi(plan.nameVi);
+    setEditPlanNameEn(plan.nameEn);
+    setEditPlanDescVi(plan.descVi || '');
+    setEditPlanDescEn(plan.descEn || '');
+    setEditPlanPriceVi(plan.priceVi);
+    setEditPlanPriceEn(plan.priceEn);
+    setEditPlanPeriodVi(plan.periodVi || '');
+    setEditPlanPeriodEn(plan.periodEn || '');
+    setEditPlanFeaturesVi(plan.featuresVi.join('\n'));
+    setEditPlanFeaturesEn(plan.featuresEn.join('\n'));
+    setEditPlanIsPopular(plan.isPopular);
+    setEditPlanButtonVariant(plan.buttonVariant);
+    setEditPlanSortOrder(plan.sortOrder);
+    setEditPlanLangTab('vi');
+  };
+
+  const closeEditPlanModal = () => setEditingPlan(null);
+
+  const openCreatePlanModal = () => {
+    setNewPlanKey('');
+    setNewPlanNameVi('');
+    setNewPlanNameEn('');
+    setNewPlanDescVi('');
+    setNewPlanDescEn('');
+    setNewPlanPriceVi('');
+    setNewPlanPriceEn('');
+    setNewPlanPeriodVi('');
+    setNewPlanPeriodEn('');
+    setNewPlanFeaturesVi('');
+    setNewPlanFeaturesEn('');
+    setNewPlanIsPopular(false);
+    setNewPlanButtonVariant('outline');
+    setNewPlanSortOrder((plans.length + 1) * 10);
+    setNewPlanLangTab('vi');
+    setIsCreatePlanOpen(true);
+  };
+
+  const closeCreatePlanModal = () => setIsCreatePlanOpen(false);
+
+  const handleSavePlan = async () => {
+    if (!editingPlan) return;
+    setIsSavingPlan(true);
+    try {
+      const updated: Partial<PricingPlan> = {
+        nameVi: editPlanNameVi.trim(),
+        nameEn: editPlanNameEn.trim(),
+        descVi: editPlanDescVi.trim() || null,
+        descEn: editPlanDescEn.trim() || null,
+        priceVi: editPlanPriceVi.trim(),
+        priceEn: editPlanPriceEn.trim(),
+        periodVi: editPlanPeriodVi.trim() || null,
+        periodEn: editPlanPeriodEn.trim() || null,
+        featuresVi: editPlanFeaturesVi
+          .split('\n')
+          .map((f) => f.trim())
+          .filter(Boolean),
+        featuresEn: editPlanFeaturesEn
+          .split('\n')
+          .map((f) => f.trim())
+          .filter(Boolean),
+        isPopular: editPlanIsPopular,
+        buttonVariant: editPlanButtonVariant,
+        sortOrder: Number(editPlanSortOrder),
+      };
+
+      const res = await savePricingPlanAction(editingPlan.key, updated);
+      if (res.success) {
+        setPlans((prev) =>
+          prev
+            .map((p) => (p.key === editingPlan.key ? { ...p, ...updated } : p))
+            .sort((a, b) => a.sortOrder - b.sortOrder),
+        );
+        closeEditPlanModal();
+        router.refresh();
+      } else {
+        alert(res.error || 'Cập nhật thất bại');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi hệ thống khi cập nhật gói');
+    } finally {
+      setIsSavingPlan(false);
+    }
+  };
+
+  const handleCreatePlan = async () => {
+    if (!newPlanKey || !newPlanNameVi || !newPlanNameEn || !newPlanPriceVi || !newPlanPriceEn) {
+      alert('Vui lòng điền đầy đủ các thông tin bắt buộc');
+      return;
+    }
+    setIsSavingPlan(true);
+    try {
+      const newPlan: PricingPlan = {
+        key: newPlanKey.toLowerCase().trim(),
+        nameVi: newPlanNameVi.trim(),
+        nameEn: newPlanNameEn.trim(),
+        descVi: newPlanDescVi.trim() || null,
+        descEn: newPlanDescEn.trim() || null,
+        priceVi: newPlanPriceVi.trim(),
+        priceEn: newPlanPriceEn.trim(),
+        periodVi: newPlanPeriodVi.trim() || null,
+        periodEn: newPlanPeriodEn.trim() || null,
+        featuresVi: newPlanFeaturesVi
+          .split('\n')
+          .map((f) => f.trim())
+          .filter(Boolean),
+        featuresEn: newPlanFeaturesEn
+          .split('\n')
+          .map((f) => f.trim())
+          .filter(Boolean),
+        isPopular: newPlanIsPopular,
+        buttonVariant: newPlanButtonVariant,
+        sortOrder: Number(newPlanSortOrder),
+      };
+
+      const res = await createPricingPlanAction(newPlan);
+      if (res.success) {
+        setPlans((prev) => [...prev, newPlan].sort((a, b) => a.sortOrder - b.sortOrder));
+        closeCreatePlanModal();
+        router.refresh();
+      } else {
+        alert(res.error || 'Thêm gói thất bại');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi hệ thống khi thêm gói');
+    } finally {
+      setIsSavingPlan(false);
+    }
+  };
+
+  const handleDeletePlan = async (key: string) => {
+    if (!window.confirm(`Xóa gói dịch vụ "${key.toUpperCase()}"? Không thể hoàn tác!`)) return;
+    try {
+      const res = await deletePricingPlanAction(key);
+      if (res.success) {
+        setPlans((prev) => prev.filter((p) => p.key !== key));
+        router.refresh();
+      } else {
+        alert(res.error || 'Xóa gói thất bại');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi hệ thống khi xóa gói');
+    }
+  };
 
   const handleDeleteLead = async (id: string | number) => {
     if (!window.confirm('Bạn có chắc chắn muốn xóa yêu cầu tư vấn này?')) return;
@@ -655,6 +854,17 @@ export default function DashboardClient({
           >
             <RiPhoneLine className='w-4 h-4' />
             Yêu cầu tư vấn ({leads.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('pricing')}
+            className={`px-5 py-3 text-xs font-extrabold border-b-2 transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'pricing'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <RiShoppingBag3Line className='w-4 h-4' />
+            Cấu hình bảng giá ({plans.length})
           </button>
         </div>
 
@@ -1111,6 +1321,115 @@ export default function DashboardClient({
                                 ) : (
                                   <RiDeleteBinLine className='w-4 h-4' />
                                 )}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'pricing' && (
+          /* ── Pricing Config Panel ── */
+          <div className='bg-slate-900/40 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl animate-fade-in'>
+            <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/60 pb-5'>
+              <div>
+                <h2 className='text-lg font-black text-white flex items-center gap-2'>
+                  <RiShoppingBag3Line className='w-5 h-5 text-primary' />
+                  Cấu hình bảng giá các gói dịch vụ
+                </h2>
+                <p className='text-xs text-slate-400 mt-1'>
+                  Quản lý danh sách các gói dịch vụ, giá tiền, tính năng hiển thị trên trang chủ.
+                </p>
+              </div>
+              <button
+                onClick={openCreatePlanModal}
+                className='px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-extrabold rounded-xl shadow-lg shadow-emerald-950/30 flex items-center gap-2 cursor-pointer transition-all self-start sm:self-center'
+              >
+                <RiAddLine className='w-4.5 h-4.5' />
+                Thêm gói dịch vụ
+              </button>
+            </div>
+
+            {plans.length === 0 ? (
+              <div className='py-20 text-center text-slate-500 space-y-3 border border-dashed border-slate-800 rounded-2xl bg-slate-900/10'>
+                <RiShoppingBag3Line className='w-12 h-12 mx-auto text-slate-700 animate-pulse' />
+                <div>
+                  <p className='text-sm font-semibold text-slate-400'>Chưa có gói dịch vụ nào</p>
+                  <p className='text-xs text-slate-600 mt-1'>
+                    Nhấp vào nút &quot;Thêm gói dịch vụ&quot; để bắt đầu.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className='overflow-x-auto -mx-6 sm:mx-0'>
+                <div className='inline-block min-w-full align-middle px-6 sm:px-0'>
+                  <div className='overflow-hidden border border-slate-800/60 rounded-2xl bg-slate-950/20'>
+                    <table className='min-w-full divide-y divide-slate-800/60 text-left text-xs'>
+                      <thead className='bg-slate-900/80 text-slate-400 font-bold uppercase tracking-wider text-3xs border-b border-slate-800/60'>
+                        <tr>
+                          <th className='px-6 py-4'>Mã (Key)</th>
+                          <th className='px-6 py-4'>Tên gói (VI / EN)</th>
+                          <th className='px-6 py-4'>Giá & Chu kỳ (VI / EN)</th>
+                          <th className='px-6 py-4'>Trạng thái</th>
+                          <th className='px-6 py-4'>Thứ tự</th>
+                          <th className='px-6 py-4 text-center'>Thao tác</th>
+                        </tr>
+                      </thead>
+                      <tbody className='divide-y divide-slate-800/40 text-slate-300'>
+                        {plans.map((plan) => (
+                          <tr
+                            key={plan.key}
+                            className='hover:bg-slate-900/30 transition-colors duration-150'
+                          >
+                            <td className='px-6 py-4.5 whitespace-nowrap font-mono font-bold text-white'>
+                              {plan.key.toUpperCase()}
+                            </td>
+                            <td className='px-6 py-4.5 space-y-1'>
+                              <div className='font-bold text-white'>{plan.nameVi}</div>
+                              <div className='text-3xs text-slate-500 italic'>{plan.nameEn}</div>
+                            </td>
+                            <td className='px-6 py-4.5 space-y-1'>
+                              <div className='font-bold text-white'>
+                                {plan.priceVi} {plan.periodVi && `/ ${plan.periodVi}`}
+                              </div>
+                              <div className='text-3xs text-slate-500 italic'>
+                                {plan.priceEn} {plan.periodEn && `/ ${plan.periodEn}`}
+                              </div>
+                            </td>
+                            <td className='px-6 py-4.5 whitespace-nowrap'>
+                              {plan.isPopular ? (
+                                <span className='inline-flex items-center gap-1 bg-primary/10 border border-primary/20 text-primary text-3xs font-extrabold px-2.5 py-1 rounded-full'>
+                                  ★ Bán chạy nhất
+                                </span>
+                              ) : (
+                                <span className='inline-flex items-center gap-1 bg-slate-800 border border-slate-700 text-slate-400 text-3xs font-extrabold px-2.5 py-1 rounded-full'>
+                                  Tiêu chuẩn
+                                </span>
+                              )}
+                            </td>
+                            <td className='px-6 py-4.5 whitespace-nowrap font-mono text-slate-400'>
+                              {plan.sortOrder}
+                            </td>
+                            <td className='px-6 py-4.5 whitespace-nowrap text-center space-x-1.5'>
+                              <button
+                                onClick={() => openEditPlanModal(plan)}
+                                className='p-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg border border-primary/20 transition-all cursor-pointer inline-flex items-center justify-center'
+                                title='Sửa gói'
+                              >
+                                <RiEditLine className='w-4 h-4' />
+                              </button>
+                              <button
+                                onClick={() => handleDeletePlan(plan.key)}
+                                className='p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-lg border border-red-500/20 transition-all cursor-pointer inline-flex items-center justify-center'
+                                title='Xóa gói'
+                              >
+                                <RiDeleteBinLine className='w-4 h-4' />
                               </button>
                             </td>
                           </tr>
@@ -1639,8 +1958,8 @@ export default function DashboardClient({
                 <button
                   type='button'
                   onClick={closeEditModal}
-                  disabled={isPending || isUploading}
-                  className='px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-extrabold rounded-xl transition-all cursor-pointer'
+                  disabled={isPending}
+                  className='px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-extrabold rounded-xl transition-all cursor-pointer'
                 >
                   Hủy
                 </button>
@@ -1648,7 +1967,7 @@ export default function DashboardClient({
                   type='button'
                   onClick={handleSave}
                   disabled={isPending || isUploading}
-                  className='flex-1 py-3 bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-extrabold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 cursor-pointer'
+                  className='flex-1 py-3 bg-primary hover:bg-primary/90 disabled:opacity-45 disabled:cursor-not-allowed text-white text-xs font-extrabold rounded-xl shadow-lg shadow-primary/20 transition-all cursor-pointer flex items-center justify-center gap-2'
                 >
                   {isPending ? (
                     <>
@@ -1659,6 +1978,542 @@ export default function DashboardClient({
                     <>
                       <RiCheckLine className='w-4 h-4' />
                       Lưu thay đổi
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════════
+          EDIT PRICING PLAN MODAL
+      ═══════════════════════════════════════════════════════════════════════ */}
+      {editingPlan && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95'>
+          <div className='w-full max-w-2xl bg-[#0f1728] border border-slate-800 rounded-3xl shadow-[0_30px_60px_-10px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col max-h-[92vh]'>
+            <div className='px-8 pt-7 pb-5 border-b border-slate-800/80 flex-shrink-0 flex items-center justify-between'>
+              <div>
+                <h2 className='text-lg font-black text-white flex items-center gap-2.5'>
+                  Chỉnh sửa gói dịch vụ
+                  <span className='bg-primary/10 border border-primary/20 text-primary font-mono text-xs font-bold px-2.5 py-1 rounded-lg'>
+                    {editingPlan.key.toUpperCase()}
+                  </span>
+                </h2>
+              </div>
+              <button
+                onClick={closeEditPlanModal}
+                className='p-2 rounded-full hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer'
+              >
+                <RiCloseLine className='w-5 h-5' />
+              </button>
+            </div>
+
+            <div className='flex-1 overflow-y-auto px-8 py-6 space-y-6'>
+              {/* Language Tabs for Plan Details */}
+              <div className='space-y-4'>
+                <div className='flex gap-2 bg-slate-900/60 border border-slate-800 rounded-2xl p-1.5'>
+                  {(['vi', 'en'] as const).map((lang) => (
+                    <button
+                      key={lang}
+                      type='button'
+                      onClick={() => setEditPlanLangTab(lang)}
+                      className={`flex-1 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                        editPlanLangTab === lang
+                          ? 'bg-primary text-white shadow-md'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {lang === 'vi' ? '🇻🇳 Tiếng Việt' : '🇬🇧 English'}
+                    </button>
+                  ))}
+                </div>
+
+                {editPlanLangTab === 'vi' ? (
+                  <div className='space-y-4'>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Tên gói (Tiếng Việt) *
+                      </label>
+                      <input
+                        type='text'
+                        value={editPlanNameVi}
+                        onChange={(e) => setEditPlanNameVi(e.target.value)}
+                        placeholder='Ví dụ: Bứt Phá (Growth)'
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                      />
+                    </div>
+                    <div className='grid grid-cols-2 gap-4'>
+                      <div className='space-y-2'>
+                        <label className='text-xs font-extrabold text-slate-400 block'>
+                          Giá cả (Tiếng Việt) *
+                        </label>
+                        <input
+                          type='text'
+                          value={editPlanPriceVi}
+                          onChange={(e) => setEditPlanPriceVi(e.target.value)}
+                          placeholder='Ví dụ: 12.9tr, Liên hệ...'
+                          className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <label className='text-xs font-extrabold text-slate-400 block'>
+                          Chu kỳ (Tiếng Việt)
+                        </label>
+                        <input
+                          type='text'
+                          value={editPlanPeriodVi}
+                          onChange={(e) => setEditPlanPeriodVi(e.target.value)}
+                          placeholder='Ví dụ: trọn gói, tháng, năm...'
+                          className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                        />
+                      </div>
+                    </div>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Mô tả (Tiếng Việt)
+                      </label>
+                      <textarea
+                        value={editPlanDescVi}
+                        onChange={(e) => setEditPlanDescVi(e.target.value)}
+                        placeholder='Mô tả ngắn về gói...'
+                        rows={2}
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all resize-none'
+                      />
+                    </div>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Danh sách tính năng (Tiếng Việt) - Mỗi dòng một tính năng
+                      </label>
+                      <textarea
+                        value={editPlanFeaturesVi}
+                        onChange={(e) => setEditPlanFeaturesVi(e.target.value)}
+                        placeholder='Website độc quyền&#10;Tặng bài viết SEO&#10;Hỗ trợ 12 tháng...'
+                        rows={6}
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white font-mono rounded-xl focus:outline-none transition-all resize-y'
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className='space-y-4'>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Plan Name (English) *
+                      </label>
+                      <input
+                        type='text'
+                        value={editPlanNameEn}
+                        onChange={(e) => setEditPlanNameEn(e.target.value)}
+                        placeholder='E.g., Growth Plan'
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                      />
+                    </div>
+                    <div className='grid grid-cols-2 gap-4'>
+                      <div className='space-y-2'>
+                        <label className='text-xs font-extrabold text-slate-400 block'>
+                          Price (English) *
+                        </label>
+                        <input
+                          type='text'
+                          value={editPlanPriceEn}
+                          onChange={(e) => setEditPlanPriceEn(e.target.value)}
+                          placeholder='E.g., $550, Custom...'
+                          className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <label className='text-xs font-extrabold text-slate-400 block'>
+                          Period (English)
+                        </label>
+                        <input
+                          type='text'
+                          value={editPlanPeriodEn}
+                          onChange={(e) => setEditPlanPeriodEn(e.target.value)}
+                          placeholder='E.g., one-time, month, year...'
+                          className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                        />
+                      </div>
+                    </div>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Description (English)
+                      </label>
+                      <textarea
+                        value={editPlanDescEn}
+                        onChange={(e) => setEditPlanDescEn(e.target.value)}
+                        placeholder='Short description of the plan...'
+                        rows={2}
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all resize-none'
+                      />
+                    </div>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Features List (English) - One feature per line
+                      </label>
+                      <textarea
+                        value={editPlanFeaturesEn}
+                        onChange={(e) => setEditPlanFeaturesEn(e.target.value)}
+                        placeholder='Premium custom design&#10;Free SEO articles&#10;12 months support...'
+                        rows={6}
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white font-mono rounded-xl focus:outline-none transition-all resize-y'
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className='h-px bg-slate-800' />
+
+              {/* Status and settings */}
+              <div className='grid grid-cols-1 sm:grid-cols-3 gap-6'>
+                <div className='space-y-2'>
+                  <label className='text-xs font-extrabold text-slate-300 block'>
+                    Nổi bật (Best Seller)
+                  </label>
+                  <label className='relative inline-flex items-center cursor-pointer pt-1'>
+                    <input
+                      type='checkbox'
+                      checked={editPlanIsPopular}
+                      onChange={(e) => setEditPlanIsPopular(e.target.checked)}
+                      className='sr-only peer'
+                    />
+                    <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[6px] after:left-[2px] after:bg-slate-300 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    <span className='ml-3 text-xs text-slate-400 font-bold'>
+                      {editPlanIsPopular ? 'Bán chạy nhất' : 'Không'}
+                    </span>
+                  </label>
+                </div>
+
+                <div className='space-y-2'>
+                  <label className='text-xs font-extrabold text-slate-300 block'>
+                    Kiểu nút chọn
+                  </label>
+                  <select
+                    value={editPlanButtonVariant}
+                    onChange={(e) =>
+                      setEditPlanButtonVariant(e.target.value as 'outline' | 'default')
+                    }
+                    className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 text-xs text-white rounded-xl focus:outline-none focus:border-primary/60'
+                  >
+                    <option value='outline'>Viền (Outline)</option>
+                    <option value='default'>Đầy (Default)</option>
+                  </select>
+                </div>
+
+                <div className='space-y-2'>
+                  <label className='text-xs font-extrabold text-slate-300 block'>
+                    Thứ tự sắp xếp
+                  </label>
+                  <input
+                    type='number'
+                    value={editPlanSortOrder}
+                    onChange={(e) => setEditPlanSortOrder(Number(e.target.value))}
+                    className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-xs text-white rounded-xl focus:outline-none transition-all'
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className='px-8 pb-7 pt-5 border-t border-slate-800/80 flex-shrink-0'>
+              <div className='flex gap-3'>
+                <button
+                  type='button'
+                  onClick={closeEditPlanModal}
+                  disabled={isSavingPlan}
+                  className='px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-extrabold rounded-xl transition-all cursor-pointer'
+                >
+                  Hủy
+                </button>
+                <button
+                  type='button'
+                  onClick={handleSavePlan}
+                  disabled={isSavingPlan}
+                  className='flex-1 py-3 bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-extrabold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 cursor-pointer'
+                >
+                  {isSavingPlan ? (
+                    <>
+                      <RiLoader4Line className='w-4 h-4 animate-spin' />
+                      Đang lưu...
+                    </>
+                  ) : (
+                    <>
+                      <RiCheckLine className='w-4 h-4' />
+                      Lưu thay đổi
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════════
+          CREATE PRICING PLAN MODAL
+      ═══════════════════════════════════════════════════════════════════════ */}
+      {isCreatePlanOpen && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95'>
+          <div className='w-full max-w-2xl bg-[#0f1728] border border-slate-800 rounded-3xl shadow-[0_30px_60px_-10px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col max-h-[92vh]'>
+            <div className='px-8 pt-7 pb-5 border-b border-slate-800/80 flex-shrink-0 flex items-center justify-between'>
+              <div>
+                <h2 className='text-lg font-black text-white'>Thêm gói dịch vụ mới</h2>
+              </div>
+              <button
+                onClick={closeCreatePlanModal}
+                className='p-2 rounded-full hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer'
+              >
+                <RiCloseLine className='w-5 h-5' />
+              </button>
+            </div>
+
+            <div className='flex-1 overflow-y-auto px-8 py-6 space-y-6'>
+              {/* Key */}
+              <div className='space-y-2'>
+                <label className='text-xs font-extrabold text-slate-300 block'>
+                  Mã định danh (Key) *
+                </label>
+                <input
+                  type='text'
+                  value={newPlanKey}
+                  onChange={(e) => setNewPlanKey(e.target.value)}
+                  placeholder='Ví dụ: starter, growth, enterprise, premium'
+                  className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all font-mono'
+                />
+                <p className='text-3xs text-slate-500'>
+                  Mã duy nhất viết thường, không dấu, không khoảng cách. Ví dụ: custom-plan
+                </p>
+              </div>
+
+              {/* Language Tabs for Plan Details */}
+              <div className='space-y-4'>
+                <div className='flex gap-2 bg-slate-900/60 border border-slate-800 rounded-2xl p-1.5'>
+                  {(['vi', 'en'] as const).map((lang) => (
+                    <button
+                      key={lang}
+                      type='button'
+                      onClick={() => setNewPlanLangTab(lang)}
+                      className={`flex-1 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                        newPlanLangTab === lang
+                          ? 'bg-primary text-white shadow-md'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {lang === 'vi' ? '🇻🇳 Tiếng Việt' : '🇬🇧 English'}
+                    </button>
+                  ))}
+                </div>
+
+                {newPlanLangTab === 'vi' ? (
+                  <div className='space-y-4'>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Tên gói (Tiếng Việt) *
+                      </label>
+                      <input
+                        type='text'
+                        value={newPlanNameVi}
+                        onChange={(e) => setNewPlanNameVi(e.target.value)}
+                        placeholder='Ví dụ: Bứt Phá (Growth)'
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                      />
+                    </div>
+                    <div className='grid grid-cols-2 gap-4'>
+                      <div className='space-y-2'>
+                        <label className='text-xs font-extrabold text-slate-400 block'>
+                          Giá cả (Tiếng Việt) *
+                        </label>
+                        <input
+                          type='text'
+                          value={newPlanPriceVi}
+                          onChange={(e) => setNewPlanPriceVi(e.target.value)}
+                          placeholder='Ví dụ: 12.9tr, Liên hệ...'
+                          className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <label className='text-xs font-extrabold text-slate-400 block'>
+                          Chu kỳ (Tiếng Việt)
+                        </label>
+                        <input
+                          type='text'
+                          value={newPlanPeriodVi}
+                          onChange={(e) => setNewPlanPeriodVi(e.target.value)}
+                          placeholder='Ví dụ: trọn gói, tháng, năm...'
+                          className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                        />
+                      </div>
+                    </div>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Mô tả (Tiếng Việt)
+                      </label>
+                      <textarea
+                        value={newPlanDescVi}
+                        onChange={(e) => setNewPlanDescVi(e.target.value)}
+                        placeholder='Mô tả ngắn về gói...'
+                        rows={2}
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all resize-none'
+                      />
+                    </div>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Danh sách tính năng (Tiếng Việt) - Mỗi dòng một tính năng
+                      </label>
+                      <textarea
+                        value={newPlanFeaturesVi}
+                        onChange={(e) => setNewPlanFeaturesVi(e.target.value)}
+                        placeholder='Website độc quyền&#10;Tặng bài viết SEO&#10;Hỗ trợ 12 tháng...'
+                        rows={6}
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white font-mono rounded-xl focus:outline-none transition-all resize-y'
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className='space-y-4'>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Plan Name (English) *
+                      </label>
+                      <input
+                        type='text'
+                        value={newPlanNameEn}
+                        onChange={(e) => setNewPlanNameEn(e.target.value)}
+                        placeholder='E.g., Growth Plan'
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                      />
+                    </div>
+                    <div className='grid grid-cols-2 gap-4'>
+                      <div className='space-y-2'>
+                        <label className='text-xs font-extrabold text-slate-400 block'>
+                          Price (English) *
+                        </label>
+                        <input
+                          type='text'
+                          value={newPlanPriceEn}
+                          onChange={(e) => setNewPlanPriceEn(e.target.value)}
+                          placeholder='E.g., $550, Custom...'
+                          className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <label className='text-xs font-extrabold text-slate-400 block'>
+                          Period (English)
+                        </label>
+                        <input
+                          type='text'
+                          value={newPlanPeriodEn}
+                          onChange={(e) => setNewPlanPeriodEn(e.target.value)}
+                          placeholder='E.g., one-time, month, year...'
+                          className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all'
+                        />
+                      </div>
+                    </div>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Description (English)
+                      </label>
+                      <textarea
+                        value={newPlanDescEn}
+                        onChange={(e) => setNewPlanDescEn(e.target.value)}
+                        placeholder='Short description of the plan...'
+                        rows={2}
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white rounded-xl focus:outline-none transition-all resize-none'
+                      />
+                    </div>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-extrabold text-slate-400 block'>
+                        Features List (English) - One feature per line
+                      </label>
+                      <textarea
+                        value={newPlanFeaturesEn}
+                        onChange={(e) => setNewPlanFeaturesEn(e.target.value)}
+                        placeholder='Premium custom design&#10;Free SEO articles&#10;12 months support...'
+                        rows={6}
+                        className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-sm text-white font-mono rounded-xl focus:outline-none transition-all resize-y'
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className='h-px bg-slate-800' />
+
+              {/* Status and settings */}
+              <div className='grid grid-cols-1 sm:grid-cols-3 gap-6'>
+                <div className='space-y-2'>
+                  <label className='text-xs font-extrabold text-slate-300 block'>
+                    Nổi bật (Best Seller)
+                  </label>
+                  <label className='relative inline-flex items-center cursor-pointer pt-1'>
+                    <input
+                      type='checkbox'
+                      checked={newPlanIsPopular}
+                      onChange={(e) => setNewPlanIsPopular(e.target.checked)}
+                      className='sr-only peer'
+                    />
+                    <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[6px] after:left-[2px] after:bg-slate-300 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    <span className='ml-3 text-xs text-slate-400 font-bold'>
+                      {newPlanIsPopular ? 'Bán chạy nhất' : 'Không'}
+                    </span>
+                  </label>
+                </div>
+
+                <div className='space-y-2'>
+                  <label className='text-xs font-extrabold text-slate-300 block'>
+                    Kiểu nút chọn
+                  </label>
+                  <select
+                    value={newPlanButtonVariant}
+                    onChange={(e) =>
+                      setNewPlanButtonVariant(e.target.value as 'outline' | 'default')
+                    }
+                    className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 text-xs text-white rounded-xl focus:outline-none focus:border-primary/60'
+                  >
+                    <option value='outline'>Viền (Outline)</option>
+                    <option value='default'>Đầy (Default)</option>
+                  </select>
+                </div>
+
+                <div className='space-y-2'>
+                  <label className='text-xs font-extrabold text-slate-300 block'>
+                    Thứ tự sắp xếp
+                  </label>
+                  <input
+                    type='number'
+                    value={newPlanSortOrder}
+                    onChange={(e) => setNewPlanSortOrder(Number(e.target.value))}
+                    className='w-full py-3 px-4 bg-slate-900/60 border border-slate-700 focus:border-primary/60 text-xs text-white rounded-xl focus:outline-none transition-all'
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className='px-8 pb-7 pt-5 border-t border-slate-800/80 flex-shrink-0'>
+              <div className='flex gap-3'>
+                <button
+                  type='button'
+                  onClick={closeCreatePlanModal}
+                  disabled={isSavingPlan}
+                  className='px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-extrabold rounded-xl transition-all cursor-pointer'
+                >
+                  Hủy
+                </button>
+                <button
+                  type='button'
+                  onClick={handleCreatePlan}
+                  disabled={isSavingPlan}
+                  className='flex-1 py-3 bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-extrabold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 cursor-pointer'
+                >
+                  {isSavingPlan ? (
+                    <>
+                      <RiLoader4Line className='w-4 h-4 animate-spin' />
+                      Đang tạo...
+                    </>
+                  ) : (
+                    <>
+                      <RiCheckLine className='w-4 h-4' />
+                      Tạo gói dịch vụ
                     </>
                   )}
                 </button>
